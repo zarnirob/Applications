@@ -310,37 +310,71 @@ function deleteRecipe(idx) {
 }
 
 // ── GITHUB API IMPORT (FETCH) ──
+// ── DYNAMIC GITHUB API IMPORT (FETCH) ──
 async function fetchFromGitHub() {
   const owner = localStorage.getItem('gh_owner');
   const repo = localStorage.getItem('gh_repo');
-  const path = localStorage.getItem('gh_path') || 'recipes.json';
+  const path = (localStorage.getItem('gh_path') || '').trim(); // e.g. "data/recipes.csv"
+  const token = localStorage.getItem('gh_token');
 
-  if (!owner || !repo) {
-    alert("Please configure GitHub settings first.");
-    ghPanel.style.display = 'flex';
+  if (!owner || !repo || !path) {
+    alert("Please fill in Owner, Repository, and File Path in settings.");
     return;
   }
 
-  syncStatus.textContent = "Fetching from GitHub...";
+  syncStatus.textContent = `Fetching '${path}' from GitHub...`;
+
   try {
-    const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/main/${path}?t=${Date.now()}`;
-    const res = await fetch(rawUrl);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    
-    const data = await res.json();
-    if (Array.isArray(data)) {
-      recipes = data;
-      saveData();
-      populateDropdowns();
-      render();
-      syncStatus.textContent = "✓ Successfully fetched from GitHub!";
+    const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
+    const headers = { "Accept": "application/vnd.github.v3.raw" };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
+    const res = await fetch(apiUrl, { headers });
+
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}: Check that '${path}' exists in '${repo}'.`);
     }
+
+    let fetchedRecipes = [];
+
+    // Check if the file path ends with .csv
+    if (path.toLowerCase().endsWith('.csv')) {
+      // Fetch as RAW TEXT for CSV files
+      const csvText = await res.text();
+      const lines = csvText.split(/\r\n|\n/);
+      
+      lines.forEach((line, index) => {
+        if (index === 0 && line.toLowerCase().includes('title')) return; // Skip CSV header
+        const cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.replace(/^"\vert{}"$/g, '').trim());
+        if (cols.length >= 2 && cols[0] && cols[1]) {
+          fetchedRecipes.push({
+            title: cols[0],
+            url: cols[1],
+            category: cols[2] || 'Uncategorized',
+            protein: cols[3] || 'N/A'
+          });
+        }
+      });
+    } else {
+      // Fetch as JSON for .json files
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        fetchedRecipes = data;
+      } else {
+        throw new Error("JSON file must contain an array of recipe objects.");
+      }
+    }
+
+    recipes = fetchedRecipes;
+    saveData();
+    populateDropdowns();
+    render();
+    syncStatus.textContent = `✓ Successfully loaded '${path}'!`;
   } catch (err) {
-    syncStatus.textContent = "Error fetching from GitHub.";
-    console.error(err);
+    syncStatus.textContent = `Fetch Error: ${err.message}`;
+    console.error("Fetch Detail:", err);
   }
 }
-
 // ── GITHUB API EXPORT (SAVE) ──
 async function pushToGitHub() {
   const owner = localStorage.getItem('gh_owner');
