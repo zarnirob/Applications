@@ -375,38 +375,77 @@ async function fetchFromGitHub() {
     console.error("Fetch Detail:", err);
   }
 }
-// ── GITHUB API EXPORT (SAVE) ──
+// Helper for UTF-8 to Base64 encoding
+function utf8ToBase64(str) {
+  const bytes = new TextEncoder().encode(str);
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+// ── DYNAMIC GITHUB API EXPORT (SAVE) ──
 async function pushToGitHub() {
   const owner = localStorage.getItem('gh_owner');
   const repo = localStorage.getItem('gh_repo');
-  const path = localStorage.getItem('gh_path') || 'recipes.json';
+  const path = (localStorage.getItem('gh_path') || '').trim();
   const token = localStorage.getItem('gh_token');
 
-  if (!owner || !repo || !token) {
-    alert("GitHub Username, Repository, and Personal Access Token are required.");
+  if (!owner || !repo || !path || !token) {
+    alert("Owner, Repository, File Path, and Personal Access Token are all required in settings.");
     ghPanel.style.display = 'flex';
     return;
   }
 
-  syncStatus.textContent = "Saving to GitHub repository...";
+  syncStatus.textContent = `Saving '${path}' to GitHub...`;
 
   try {
     const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
-    
-    // 1. Check if file exists to get existing SHA
+
+    // 1. Fetch existing file SHA if file exists in repo
     let sha = null;
     const getRes = await fetch(apiUrl, {
-      headers: { "Authorization": `Bearer ${token}`, "Accept": "application/vnd.github+json" }
+      headers: { 
+        "Authorization": `Bearer ${token}`, 
+        "Accept": "application/vnd.github+json" 
+      }
     });
+
     if (getRes.ok) {
       const fileData = await getRes.json();
       sha = fileData.sha;
     }
 
-    // 2. Base64 Encode content
-    const contentEncoded = btoa(unescape(encodeURIComponent(JSON.stringify(recipes, null, 2))));
+    // 2. Format content string based on file extension
+    let fileContentString = "";
 
-    // 3. Commit file to repo
+    if (path.toLowerCase().endsWith('.csv')) {
+      fileContentString = "Title,URL,Category,Protein\n";
+      recipes.forEach(r => {
+        const title = `"${(r.title || '').replace(/"/g, '""')}"`;
+        const url = `"${(r.url || '').replace(/"/g, '""')}"`;
+        const cat = `"${(r.category || '').replace(/"/g, '""')}"`;
+        const prot = `"${(r.protein || '').replace(/"/g, '""')}"`;
+        fileContentString += `${title},${url},${cat},${prot}\n`;
+      });
+    } else {
+      fileContentString = JSON.stringify(recipes, null, 2);
+    }
+
+    // 3. Encode content to Base64 safely
+    const contentEncoded = utf8ToBase64(fileContentString);
+
+    // 4. Construct API payload (omit sha field completely if null)
+    const payload = {
+      message: `Update ${path} via Recipe Dashboard`,
+      content: contentEncoded
+    };
+    if (sha) {
+      payload.sha = sha;
+    }
+
+    // 5. Send PUT request to GitHub API
     const putRes = await fetch(apiUrl, {
       method: "PUT",
       headers: {
@@ -414,22 +453,21 @@ async function pushToGitHub() {
         "Content-Type": "application/json",
         "Accept": "application/vnd.github+json"
       },
-      body: JSON.stringify({
-        message: "Update recipe database via dashboard",
-        content: contentEncoded,
-        sha: sha || undefined
-      })
+      body: JSON.stringify(payload)
     });
 
-    if (!putRes.ok) throw new Error(`Commit failed with status ${putRes.status}`);
+    if (!putRes.ok) {
+      const errData = await putRes.json().catch(() => ({}));
+      const detailedMsg = errData.message || putRes.statusText || `Status ${putRes.status}`;
+      throw new Error(`HTTP ${putRes.status}: ${detailedMsg}`);
+    }
 
-    syncStatus.textContent = "✓ Successfully committed to GitHub!";
+    syncStatus.textContent = `✓ Successfully committed '${path}' to GitHub!`;
   } catch (err) {
-    syncStatus.textContent = "Failed to commit to GitHub.";
-    console.error(err);
+    syncStatus.textContent = `Save Error: ${err.message}`;
+    console.error("Save Detail:", err);
   }
 }
-
 fetchGhBtn.addEventListener('click', fetchFromGitHub);
 pushGhBtn.addEventListener('click', pushToGitHub);
 
