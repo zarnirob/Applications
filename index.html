@@ -491,13 +491,27 @@ async function pushToGitHub() {
 fetchGhBtn.addEventListener('click', fetchFromGitHub);
 pushGhBtn.addEventListener('click', pushToGitHub);
 
-// ── EXTENSION POPUP LISTENER ──
+let lastAddedUrl = "";
+let lastAddedTime = 0;
+
 function handleExtensionRecipe(rawRecipe) {
   if (!rawRecipe) return;
   
+  const currentUrl = String(rawRecipe.url || '').trim();
+  const now = Date.now();
+
+  // Prevent duplicate additions within 2 seconds
+  if (currentUrl === lastAddedUrl && (now - lastAddedTime) < 2000) {
+    console.log("Duplicate event blocked");
+    return;
+  }
+
+  lastAddedUrl = currentUrl;
+  lastAddedTime = now;
+
   const newRecipe = {
     title: String(rawRecipe.title || '').trim(),
-    url: String(rawRecipe.url || '').trim(),
+    url: currentUrl,
     category: String(rawRecipe.category || 'Uncategorized').trim(),
     protein: String(rawRecipe.protein || 'N/A').trim()
   };
