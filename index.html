@@ -159,7 +159,7 @@
       <select id="protFilter"><option value="">All Proteins</option></select>
     </div>
     <div class="filter-actions">
-      <button class="btn btn-ghost" id="clearBtn">Clear</button>
+      <button class="btn btn-ghost" id="clearBtn">Clear Filters</button>
     </div>
   </div>
 
@@ -204,7 +204,7 @@
         </div>
         <div class="gh-field">
           <label>File Path in Repo</label>
-          <input type="text" id="ghPath" placeholder="recipes.json">
+          <input type="text" id="ghPath" placeholder="data/recipes.csv">
         </div>
         <div class="gh-field">
           <label>Personal Access Token (PAT)</label>
@@ -226,6 +226,7 @@ const countLabel = document.getElementById('countLabel');
 const qInput = document.getElementById('q');
 const catSelect = document.getElementById('catFilter');
 const protSelect = document.getElementById('protFilter');
+const clearBtn = document.getElementById('clearBtn');
 const syncStatus = document.getElementById('syncStatus');
 
 // GitHub Credentials Elements
@@ -243,7 +244,7 @@ const ghToken = document.getElementById('ghToken');
 // Load stored GitHub Config
 ghOwner.value = localStorage.getItem('gh_owner') || '';
 ghRepo.value = localStorage.getItem('gh_repo') || '';
-ghPath.value = localStorage.getItem('gh_path') || 'recipes.json';
+ghPath.value = localStorage.getItem('gh_path') || 'data/recipes.csv';
 ghToken.value = localStorage.getItem('gh_token') || '';
 
 openGhToggle.addEventListener('click', () => {
@@ -253,7 +254,7 @@ openGhToggle.addEventListener('click', () => {
 saveGhConfig.addEventListener('click', () => {
   localStorage.setItem('gh_owner', ghOwner.value.trim());
   localStorage.setItem('gh_repo', ghRepo.value.trim());
-  localStorage.setItem('gh_path', ghPath.value.trim() || 'recipes.json');
+  localStorage.setItem('gh_path', ghPath.value.trim() || 'data/recipes.csv');
   localStorage.setItem('gh_token', ghToken.value.trim());
   syncStatus.textContent = 'GitHub credentials saved!';
   setTimeout(() => syncStatus.textContent = '', 3000);
@@ -309,12 +310,23 @@ function deleteRecipe(idx) {
   render();
 }
 
-// ── GITHUB API IMPORT (FETCH) ──
+// ── REAL-TIME FILTER EVENT LISTENERS ──
+qInput.addEventListener('input', render);
+catSelect.addEventListener('change', render);
+protSelect.addEventListener('change', render);
+
+clearBtn.addEventListener('click', () => {
+  qInput.value = '';
+  catSelect.value = '';
+  protSelect.value = '';
+  render();
+});
+
 // ── DYNAMIC GITHUB API IMPORT (FETCH) ──
 async function fetchFromGitHub() {
   const owner = localStorage.getItem('gh_owner');
   const repo = localStorage.getItem('gh_repo');
-  const path = (localStorage.getItem('gh_path') || '').trim(); // e.g. "data/recipes.csv"
+  const path = (localStorage.getItem('gh_path') || '').trim();
   const token = localStorage.getItem('gh_token');
 
   if (!owner || !repo || !path) {
@@ -337,14 +349,12 @@ async function fetchFromGitHub() {
 
     let fetchedRecipes = [];
 
-    // Check if the file path ends with .csv
     if (path.toLowerCase().endsWith('.csv')) {
-      // Fetch as RAW TEXT for CSV files
       const csvText = await res.text();
       const lines = csvText.split(/\r\n|\n/);
       
       lines.forEach((line, index) => {
-        if (index === 0 && line.toLowerCase().includes('title')) return; // Skip CSV header
+        if (index === 0 && line.toLowerCase().includes('title')) return;
         const cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.replace(/^"\vert{}"$/g, '').trim());
         if (cols.length >= 2 && cols[0] && cols[1]) {
           fetchedRecipes.push({
@@ -356,7 +366,6 @@ async function fetchFromGitHub() {
         }
       });
     } else {
-      // Fetch as JSON for .json files
       const data = await res.json();
       if (Array.isArray(data)) {
         fetchedRecipes = data;
@@ -375,6 +384,7 @@ async function fetchFromGitHub() {
     console.error("Fetch Detail:", err);
   }
 }
+
 // Helper for UTF-8 to Base64 encoding
 function utf8ToBase64(str) {
   const bytes = new TextEncoder().encode(str);
@@ -403,7 +413,6 @@ async function pushToGitHub() {
   try {
     const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
 
-    // 1. Fetch existing file SHA if file exists in repo
     let sha = null;
     const getRes = await fetch(apiUrl, {
       headers: { 
@@ -417,7 +426,6 @@ async function pushToGitHub() {
       sha = fileData.sha;
     }
 
-    // 2. Format content string based on file extension
     let fileContentString = "";
 
     if (path.toLowerCase().endsWith('.csv')) {
@@ -433,10 +441,8 @@ async function pushToGitHub() {
       fileContentString = JSON.stringify(recipes, null, 2);
     }
 
-    // 3. Encode content to Base64 safely
     const contentEncoded = utf8ToBase64(fileContentString);
 
-    // 4. Construct API payload (omit sha field completely if null)
     const payload = {
       message: `Update ${path} via Recipe Dashboard`,
       content: contentEncoded
@@ -445,7 +451,6 @@ async function pushToGitHub() {
       payload.sha = sha;
     }
 
-    // 5. Send PUT request to GitHub API
     const putRes = await fetch(apiUrl, {
       method: "PUT",
       headers: {
@@ -468,6 +473,7 @@ async function pushToGitHub() {
     console.error("Save Detail:", err);
   }
 }
+
 fetchGhBtn.addEventListener('click', fetchFromGitHub);
 pushGhBtn.addEventListener('click', pushToGitHub);
 
