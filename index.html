@@ -492,21 +492,39 @@ fetchGhBtn.addEventListener('click', fetchFromGitHub);
 pushGhBtn.addEventListener('click', pushToGitHub);
 
 // ── EXTENSION POPUP LISTENER ──
+function handleExtensionRecipe(rawRecipe) {
+  if (!rawRecipe) return;
+  
+  const newRecipe = {
+    title: String(rawRecipe.title || '').trim(),
+    url: String(rawRecipe.url || '').trim(),
+    category: String(rawRecipe.category || 'Uncategorized').trim(),
+    protein: String(rawRecipe.protein || 'N/A').trim()
+  };
+
+  recipes.unshift(newRecipe);
+  saveData();
+  populateDropdowns();
+  render();
+  syncStatus.textContent = `✓ Added "${newRecipe.title}" from extension!`;
+}
+
+// Handler for CustomEvent (JSON String Payload)
 window.addEventListener("ExtensionAddRecipe", (e) => {
   if (e.detail) {
-    // Reconstruct into a plain page object to bypass Firefox Xray security restrictions
-    const newRecipe = {
-      title: String(e.detail.title || '').trim(),
-      url: String(e.detail.url || '').trim(),
-      category: String(e.detail.category || 'Uncategorized').trim(),
-      protein: String(e.detail.protein || 'N/A').trim()
-    };
+    try {
+      const data = typeof e.detail === "string" ? JSON.parse(e.detail) : e.detail;
+      handleExtensionRecipe(data);
+    } catch (err) {
+      console.error("Failed to parse recipe detail:", err);
+    }
+  }
+});
 
-    recipes.unshift(newRecipe);
-    saveData();
-    populateDropdowns();
-    render();
-    syncStatus.textContent = `✓ Added "${newRecipe.title}" from extension!`;
+// Handler for postMessage (Structured Clone Payload)
+window.addEventListener("message", (e) => {
+  if (e.data && e.data.type === "FROM_EXTENSION_ADD_RECIPE" && e.data.recipe) {
+    handleExtensionRecipe(e.data.recipe);
   }
 });
 
