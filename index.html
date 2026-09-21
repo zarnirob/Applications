@@ -494,11 +494,19 @@ pushGhBtn.addEventListener('click', pushToGitHub);
 // ── EXTENSION POPUP LISTENER ──
 window.addEventListener("ExtensionAddRecipe", (e) => {
   if (e.detail) {
-    recipes.unshift(e.detail);
+    // Reconstruct into a plain page object to bypass Firefox Xray security restrictions
+    const newRecipe = {
+      title: String(e.detail.title || '').trim(),
+      url: String(e.detail.url || '').trim(),
+      category: String(e.detail.category || 'Uncategorized').trim(),
+      protein: String(e.detail.protein || 'N/A').trim()
+    };
+
+    recipes.unshift(newRecipe);
     saveData();
     populateDropdowns();
     render();
-    syncStatus.textContent = `✓ Added "${e.detail.title}" from extension!`;
+    syncStatus.textContent = `✓ Added "${newRecipe.title}" from extension!`;
   }
 });
 
