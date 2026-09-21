@@ -82,8 +82,13 @@
     padding: 7px 10px;
     outline: none;
   }
-  .filter-group input { width: 260px; }
-  .filter-group select { width: 200px; }
+  .filter-group input { width: 220px; }
+  .filter-group select { width: 180px; }
+
+  .search-box-row {
+    display: flex;
+    gap: 6px;
+  }
 
   .filter-actions { display: flex; gap: 8px; margin-left: auto; }
   .btn {
@@ -148,7 +153,10 @@
   <div class="filters">
     <div class="filter-group">
       <label>Search title</label>
-      <input type="text" id="q" placeholder="Search recipes…" autocomplete="off">
+      <div class="search-box-row">
+        <input type="text" id="q" placeholder="Search recipes…" autocomplete="off">
+        <button class="btn btn-primary" id="searchBtn" style="padding: 7px 14px;">🔍 Search</button>
+      </div>
     </div>
     <div class="filter-group">
       <label>Category</label>
@@ -224,6 +232,7 @@ let recipes = JSON.parse(localStorage.getItem('my_recipes')) || [];
 const tbody = document.getElementById('tbody');
 const countLabel = document.getElementById('countLabel');
 const qInput = document.getElementById('q');
+const searchBtn = document.getElementById('searchBtn');
 const catSelect = document.getElementById('catFilter');
 const protSelect = document.getElementById('protFilter');
 const clearBtn = document.getElementById('clearBtn');
@@ -310,8 +319,13 @@ function deleteRecipe(idx) {
   render();
 }
 
-// ── REAL-TIME FILTER EVENT LISTENERS ──
-qInput.addEventListener('input', render);
+// ── SEARCH & FILTER LISTENERS ──
+searchBtn.addEventListener('click', render);
+qInput.addEventListener('input', render); // Live search as you type
+qInput.addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') render();
+});
+
 catSelect.addEventListener('change', render);
 protSelect.addEventListener('change', render);
 
