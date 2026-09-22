@@ -242,8 +242,20 @@
 </div>
 
 <script>
+// Clean non-ASCII characters from headers/tokens
+function cleanAscii(str) {
+  return String(str || '').replace(/[^\x20-\x7E]/g, '').trim();
+}
+
 // State Management & Migration
-let recipes = (JSON.parse(localStorage.getItem('my_recipes')) || []).map(r => ({
+let rawRecipes = [];
+try {
+  rawRecipes = JSON.parse(localStorage.getItem('my_recipes')) || [];
+} catch (e) {
+  rawRecipes = [];
+}
+
+let recipes = rawRecipes.map(r => ({
   title: String(r.title || '').trim(),
   url: String(r.url || '').trim(),
   category: String(r.category || 'Uncategorized').trim(),
@@ -277,11 +289,6 @@ const ghRepo = document.getElementById('ghRepo');
 const ghPath = document.getElementById('ghPath');
 const ghToken = document.getElementById('ghToken');
 
-// Clean non-ASCII characters from headers/tokens
-function cleanAscii(str) {
-  return String(str || '').replace(/[^\x20-\x7E]/g, '').trim();
-}
-
 // Load stored GitHub Config
 ghOwner.value = cleanAscii(localStorage.getItem('gh_owner'));
 ghRepo.value = cleanAscii(localStorage.getItem('gh_repo'));
@@ -311,6 +318,13 @@ saveGhConfig.addEventListener('click', () => {
   syncStatus.textContent = 'GitHub credentials saved!';
   setTimeout(() => syncStatus.textContent = '', 3000);
 });
+
+// Helper for GitHub URL paths
+function formatGitHubApiUrl(owner, repo, path) {
+  const cleanPath = path.replace(/^\/+|\/+$/g, '');
+  const encodedPath = cleanPath.split('/').map(encodeURIComponent).join('/');
+  return `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encodedPath}`;
+}
 
 // Dropdowns and Render Logic
 function populateDropdowns() {
@@ -432,7 +446,7 @@ async function fetchFromGitHub() {
   syncStatus.textContent = `Fetching '${path}' from GitHub...`;
 
   try {
-    const apiUrl = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${path}`;
+    const apiUrl = formatGitHubApiUrl(owner, repo, path);
     const headers = { "Accept": "application/vnd.github.v3.raw" };
     if (token) headers["Authorization"] = `Bearer ${token}`;
 
@@ -442,14 +456,40 @@ async function fetchFromGitHub() {
       throw new Error(`HTTP ${res.status}: Check that '${path}' exists in '${repo}'.`);
     }
 
+    const rawText = await res.text();
     let fetchedRecipes = [];
+    let isJsonParsed = false;
 
-    if (path.toLowerCase().endsWith('.csv')) {
-      const csvText = await res.text();
-      const lines = csvText.split(/\r\n|\n/);
+    // Safe JSON check
+    if (rawText.trim().startsWith('[') || rawText.trim().startsWith('{')) {
+      try {
+        const data = JSON.parse(rawText);
+        const arrayData = Array.isArray(data) ? data : [data];
+        arrayData.forEach((r) => {
+          if (r && (r.title || r.url)) {
+            fetchedRecipes.push({
+              title: r.title || '',
+              url: r.url || '',
+              category: r.category || 'Uncategorized',
+              protein: r.protein || 'N/A',
+              favorite: !!r.favorite,
+              added: r.added || new Date().toISOString().split('T')[0]
+            });
+          }
+        });
+        isJsonParsed = true;
+      } catch (e) {
+        console.warn("JSON parse attempt failed, falling back to CSV parsing:", e);
+      }
+    }
 
+    // CSV Parse Fallback
+    if (!isJsonParsed) {
+      const lines = rawText.split(/\r\n|\n/);
       lines.forEach((line, index) => {
         if (index === 0 && line.toLowerCase().includes('title')) return;
+        if (!line.trim()) return;
+
         const cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.replace(/^"\vert{}"$/g, '').trim());
         
         if (cols.length >= 2 && cols[0] && cols[1]) {
@@ -465,20 +505,6 @@ async function fetchFromGitHub() {
           });
         }
       });
-    } else {
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        data.forEach((r) => {
-          fetchedRecipes.push({
-            title: r.title || '',
-            url: r.url || '',
-            category: r.category || 'Uncategorized',
-            protein: r.protein || 'N/A',
-            favorite: !!r.favorite,
-            added: r.added || new Date().toISOString().split('T')[0]
-          });
-        });
-      }
     }
 
     recipes = fetchedRecipes;
@@ -508,7 +534,7 @@ async function pushToGitHub() {
   syncStatus.textContent = `Saving '${path}' to GitHub...`;
 
   try {
-    const apiUrl = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${path}`;
+    const apiUrl = formatGitHubApiUrl(owner, repo, path);
 
     let sha = null;
     const getRes = await fetch(apiUrl, {
@@ -519,8 +545,12 @@ async function pushToGitHub() {
     });
 
     if (getRes.ok) {
-      const fileData = await getRes.json();
-      sha = fileData.sha;
+      try {
+        const fileData = await getRes.json();
+        sha = fileData.sha || null;
+      } catch (e) {
+        console.warn("Could not parse file sha metadata:", e);
+      }
     }
 
     let fileContentString = "";
@@ -562,9 +592,15 @@ async function pushToGitHub() {
     });
 
     if (!putRes.ok) {
-      const errData = await putRes.json().catch(() => ({}));
-      const detailedMsg = errData.message || putRes.statusText || `Status ${putRes.status}`;
-      throw new Error(`HTTP ${putRes.status}: ${detailedMsg}`);
+      let detailedMsg = `HTTP ${putRes.status}`;
+      try {
+        const errData = await putRes.json();
+        detailedMsg = errData.message || putRes.statusText || detailedMsg;
+      } catch (e) {
+        const rawErrText = await putRes.text().catch(() => '');
+        detailedMsg = rawErrText || putRes.statusText || detailedMsg;
+      }
+      throw new Error(detailedMsg);
     }
 
     syncStatus.textContent = `✓ Successfully committed '${path}' to GitHub!`;
