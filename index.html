@@ -267,21 +267,37 @@ const ghRepo = document.getElementById('ghRepo');
 const ghPath = document.getElementById('ghPath');
 const ghToken = document.getElementById('ghToken');
 
+// Clean non-ASCII characters from headers/tokens
+function cleanAscii(str) {
+  return String(str || '').replace(/[^\x20-\x7E]/g, '').trim();
+}
+
 // Load stored GitHub Config
-ghOwner.value = localStorage.getItem('gh_owner') || '';
-ghRepo.value = localStorage.getItem('gh_repo') || '';
-ghPath.value = localStorage.getItem('gh_path') || 'data/recipes.csv';
-ghToken.value = localStorage.getItem('gh_token') || '';
+ghOwner.value = cleanAscii(localStorage.getItem('gh_owner'));
+ghRepo.value = cleanAscii(localStorage.getItem('gh_repo'));
+ghPath.value = cleanAscii(localStorage.getItem('gh_path')) || 'data/recipes.csv';
+ghToken.value = cleanAscii(localStorage.getItem('gh_token'));
 
 openGhToggle.addEventListener('click', () => {
   ghPanel.style.display = ghPanel.style.display === 'none' ? 'flex' : 'none';
 });
 
 saveGhConfig.addEventListener('click', () => {
-  localStorage.setItem('gh_owner', ghOwner.value.trim());
-  localStorage.setItem('gh_repo', ghRepo.value.trim());
-  localStorage.setItem('gh_path', ghPath.value.trim() || 'data/recipes.csv');
-  localStorage.setItem('gh_token', ghToken.value.trim());
+  const cleanOwner = cleanAscii(ghOwner.value);
+  const cleanRepository = cleanAscii(ghRepo.value);
+  const cleanFilePath = cleanAscii(ghPath.value) || 'data/recipes.csv';
+  const cleanPAT = cleanAscii(ghToken.value);
+
+  localStorage.setItem('gh_owner', cleanOwner);
+  localStorage.setItem('gh_repo', cleanRepository);
+  localStorage.setItem('gh_path', cleanFilePath);
+  localStorage.setItem('gh_token', cleanPAT);
+
+  ghOwner.value = cleanOwner;
+  ghRepo.value = cleanRepository;
+  ghPath.value = cleanFilePath;
+  ghToken.value = cleanPAT;
+
   syncStatus.textContent = 'GitHub credentials saved!';
   setTimeout(() => syncStatus.textContent = '', 3000);
 });
@@ -392,10 +408,10 @@ function utf8ToBase64(str) {
 
 // ── DYNAMIC GITHUB API IMPORT (FETCH) ──
 async function fetchFromGitHub() {
-  const owner = localStorage.getItem('gh_owner');
-  const repo = localStorage.getItem('gh_repo');
-  const path = (localStorage.getItem('gh_path') || '').trim();
-  const token = localStorage.getItem('gh_token');
+  const owner = cleanAscii(localStorage.getItem('gh_owner'));
+  const repo = cleanAscii(localStorage.getItem('gh_repo'));
+  const path = cleanAscii(localStorage.getItem('gh_path'));
+  const token = cleanAscii(localStorage.getItem('gh_token'));
 
   if (!owner || !repo || !path) {
     alert("Please fill in Owner, Repository, and File Path in settings.");
@@ -405,7 +421,7 @@ async function fetchFromGitHub() {
   syncStatus.textContent = `Fetching '${path}' from GitHub...`;
 
   try {
-    const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
+    const apiUrl = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${path}`;
     const headers = { "Accept": "application/vnd.github.v3.raw" };
     if (token) headers["Authorization"] = `Bearer ${token}`;
 
@@ -422,7 +438,7 @@ async function fetchFromGitHub() {
       const lines = csvText.split(/\r\n|\n/);
 
       lines.forEach((line, index) => {
-        if (index === 0 && line.toLowerCase().includes('title')) return; // Skip CSV header
+        if (index === 0 && line.toLowerCase().includes('title')) return;
         const cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.replace(/^"\vert{}"$/g, '').trim());
         
         if (cols.length >= 2 && cols[0] && cols[1]) {
@@ -467,10 +483,10 @@ async function fetchFromGitHub() {
 
 // ── DYNAMIC GITHUB API EXPORT (SAVE) ──
 async function pushToGitHub() {
-  const owner = localStorage.getItem('gh_owner');
-  const repo = localStorage.getItem('gh_repo');
-  const path = (localStorage.getItem('gh_path') || '').trim();
-  const token = localStorage.getItem('gh_token');
+  const owner = cleanAscii(localStorage.getItem('gh_owner'));
+  const repo = cleanAscii(localStorage.getItem('gh_repo'));
+  const path = cleanAscii(localStorage.getItem('gh_path'));
+  const token = cleanAscii(localStorage.getItem('gh_token'));
 
   if (!owner || !repo || !path || !token) {
     alert("Owner, Repository, File Path, and Personal Access Token are all required in settings.");
@@ -481,7 +497,7 @@ async function pushToGitHub() {
   syncStatus.textContent = `Saving '${path}' to GitHub...`;
 
   try {
-    const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
+    const apiUrl = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${path}`;
 
     let sha = null;
     const getRes = await fetch(apiUrl, {
