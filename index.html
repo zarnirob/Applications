@@ -127,6 +127,8 @@
     transition: transform 0.1s ease;
   }
   .fav-star:hover { background: var(--surface2); transform: scale(1.15); }
+  .fav-star.active { color: #f5c518; }
+  .fav-star.inactive { color: #5a5850; }
 
   .open-bar { display: flex; align-items: center; gap: 12px; padding-top: 12px; flex-wrap: wrap; }
   
@@ -195,12 +197,12 @@
       <table>
         <thead>
           <tr>
-            <th style="width: 80px; text-align: center;">Favorite</th>
+            <th style="width: 70px; text-align: center;">Favorite</th>
             <th>Title</th>
             <th>Category</th>
             <th>Protein</th>
             <th>Date Added</th>
-            <th style="width: 50px;"></th>
+            <th style="width: 40px;"></th>
           </tr>
         </thead>
         <tbody id="tbody"></tbody>
@@ -240,8 +242,16 @@
 </div>
 
 <script>
-// State Management
-let recipes = JSON.parse(localStorage.getItem('my_recipes')) || [];
+// State Management & Migration
+let recipes = (JSON.parse(localStorage.getItem('my_recipes')) || []).map(r => ({
+  title: String(r.title || '').trim(),
+  url: String(r.url || '').trim(),
+  category: String(r.category || 'Uncategorized').trim(),
+  protein: String(r.protein || 'N/A').trim(),
+  favorite: !!r.favorite,
+  added: r.added || new Date().toISOString().split('T')[0]
+}));
+
 let favOnly = false;
 
 // DOM Elements
@@ -338,11 +348,12 @@ function render() {
     const origIdx = recipes.indexOf(r);
     const isFav = !!r.favorite;
     const starIcon = isFav ? '⭐' : '☆';
-    
+    const starClass = isFav ? 'fav-star active' : 'fav-star inactive';
+
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td style="text-align: center;">
-        <button class="fav-star" onclick="toggleFavorite(${origIdx})" title="Toggle Favorite">${starIcon}</button>
+        <button class="${starClass}" onclick="toggleFavorite(${origIdx})" title="Toggle Favorite">${starIcon}</button>
       </td>
       <td><a href="${r.url}" target="_blank" style="color:inherit;text-decoration:none;">${r.title}</a></td>
       <td>${r.category || 'Uncategorized'}</td>
@@ -442,7 +453,7 @@ async function fetchFromGitHub() {
         const cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.replace(/^"\vert{}"$/g, '').trim());
         
         if (cols.length >= 2 && cols[0] && cols[1]) {
-          const isFav = cols[4] ? cols[4].toLowerCase() === 'true' : false;
+          const isFav = cols[4] ? ['true', '1', 'yes'].includes(cols[4].toLowerCase()) : false;
 
           fetchedRecipes.push({
             title: cols[0],
