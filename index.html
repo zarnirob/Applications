@@ -337,68 +337,59 @@ clearBtn.addEventListener('click', () => {
 });
 
 // ── DYNAMIC GITHUB API IMPORT (FETCH) ──
-async function fetchFromGitHub() {
-  const owner = localStorage.getItem('gh_owner');
-  const repo = localStorage.getItem('gh_repo');
-  const path = (localStorage.getItem('gh_path') || '').trim();
-  const token = localStorage.getItem('gh_token');
+const fetchedRecipes = [];
+const newFavorites = new Set();
 
-  if (!owner || !repo || !path) {
-    alert("Please fill in Owner, Repository, and File Path in settings.");
-    return;
-  }
+if (path.toLowerCase().endsWith('.csv')) {
+  const csvText = await res.text();
+  const lines = csvText.split(/\r\n|\n/);
 
-  syncStatus.textContent = `Fetching '${path}' from GitHub...`;
+  lines.forEach((line, index) => {
+    if (index === 0 && line.toLowerCase().includes('title')) return; // Skip CSV header
+    const cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.replace(/^"|"$/g, '').trim());
+    
+    if (cols.length >= 2 && cols[0] && cols[1]) {
+      const recipeIdx = fetchedRecipes.length;
+      const isFavorite = cols[4] && cols[4].toLowerCase() === 'true';
 
-  try {
-    const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
-    const headers = { "Accept": "application/vnd.github.v3.raw" };
-    if (token) headers["Authorization"] = `Bearer ${token}`;
-
-    const res = await fetch(apiUrl, { headers });
-
-    if (!res.ok) {
-      throw new Error(`HTTP ${res.status}: Check that '${path}' exists in '${repo}'.`);
-    }
-
-    let fetchedRecipes = [];
-
-    if (path.toLowerCase().endsWith('.csv')) {
-      const csvText = await res.text();
-      const lines = csvText.split(/\r\n|\n/);
-      
-      lines.forEach((line, index) => {
-        if (index === 0 && line.toLowerCase().includes('title')) return;
-        const cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.replace(/^"\vert{}"$/g, '').trim());
-        if (cols.length >= 2 && cols[0] && cols[1]) {
-          fetchedRecipes.push({
-            title: cols[0],
-            url: cols[1],
-            category: cols[2] || 'Uncategorized',
-            protein: cols[3] || 'N/A'
-          });
-        }
+      fetchedRecipes.push({
+        title: cols[0],
+        url: cols[1],
+        category: cols[2] || 'Uncategorized',
+        protein: cols[3] || 'N/A',
+        favorite: isFavorite,
+        added: cols[5] || new Date().toISOString().split('T')[0]
       });
-    } else {
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        fetchedRecipes = data;
-      } else {
-        throw new Error("JSON file must contain an array of recipe objects.");
+
+      if (isFavorite) {
+        newFavorites.add(recipeIdx);
       }
     }
-
-    recipes = fetchedRecipes;
-    saveData();
-    populateDropdowns();
-    render();
-    syncStatus.textContent = `✓ Successfully loaded '${path}'!`;
-  } catch (err) {
-    syncStatus.textContent = `Fetch Error: ${err.message}`;
-    console.error("Fetch Detail:", err);
+  });
+} else {
+  const data = await res.json();
+  if (Array.isArray(data)) {
+    data.forEach((r, idx) => {
+      fetchedRecipes.push({
+        title: r.title,
+        url: r.url,
+        category: r.category || 'Uncategorized',
+        protein: r.protein || 'N/A',
+        favorite: !!r.favorite,
+        added: r.added || new Date().toISOString().split('T')[0]
+      });
+      if (r.favorite) {
+        newFavorites.add(idx);
+      }
+    });
   }
 }
 
+recipes = fetchedRecipes;
+favorites = newFavorites;
+saveData();
+populateDropdowns();
+render();
 // Helper for UTF-8 to Base64 encoding
 function utf8ToBase64(str) {
   const bytes = new TextEncoder().encode(str);
@@ -442,17 +433,27 @@ async function pushToGitHub() {
 
     let fileContentString = "";
 
+    // Inside pushToGitHub()
     if (path.toLowerCase().endsWith('.csv')) {
-      fileContentString = "Title,URL,Category,Protein\n";
-      recipes.forEach(r => {
+      fileContentString = "Title,URL,Category,Protein,Favorite,Added\n";
+      recipes.forEach((r, idx) => {
         const title = `"${(r.title || '').replace(/"/g, '""')}"`;
         const url = `"${(r.url || '').replace(/"/g, '""')}"`;
         const cat = `"${(r.category || '').replace(/"/g, '""')}"`;
         const prot = `"${(r.protein || '').replace(/"/g, '""')}"`;
-        fileContentString += `${title},${url},${cat},${prot}\n`;
-      });
+        const isFav = favorites.has(idx) ? "true" : (r.favorite ? "true" : "false");
+        const added = `"${(r.added || new Date().toISOString().split('T')[0]).replace(/"/g, '""')}"`;
+    
+        fileContentString += `${title},${url},${cat},${prot},${isFav},${added}\n`;
+       });
     } else {
-      fileContentString = JSON.stringify(recipes, null, 2);
+      // If JSON format
+       const payloadData = recipes.map((r, idx) => ({
+        ...r,
+        favorite: favorites.has(idx) || !!r.favorite,
+        added: r.added || new Date().toISOString().split('T')[0]
+      }));
+      fileContentString = JSON.stringify(payloadData, null, 2);
     }
 
     const contentEncoded = utf8ToBase64(fileContentString);
@@ -526,22 +527,29 @@ function handleExtensionRecipe(rawRecipe) {
 // Handler for CustomEvent (JSON String Payload)
 window.addEventListener("ExtensionAddRecipe", (e) => {
   if (e.detail) {
+    let rawRecipe;
     try {
-      const data = typeof e.detail === "string" ? JSON.parse(e.detail) : e.detail;
-      handleExtensionRecipe(data);
+      rawRecipe = typeof e.detail === "string" ? JSON.parse(e.detail) : e.detail;
     } catch (err) {
-      console.error("Failed to parse recipe detail:", err);
+      return;
     }
+
+    const newRecipe = {
+      title: String(rawRecipe.title || '').trim(),
+      url: String(rawRecipe.url || '').trim(),
+      category: String(rawRecipe.category || 'Uncategorized').trim(),
+      protein: String(rawRecipe.protein || 'N/A').trim(),
+      favorite: false,
+      added: new Date().toISOString().split('T')[0]
+    };
+
+    recipes.unshift(newRecipe);
+    saveData();
+    populateDropdowns();
+    render();
+    syncStatus.textContent = `✓ Added "${newRecipe.title}" from extension!`;
   }
 });
-
-// Handler for postMessage (Structured Clone Payload)
-window.addEventListener("message", (e) => {
-  if (e.data && e.data.type === "FROM_EXTENSION_ADD_RECIPE" && e.data.recipe) {
-    handleExtensionRecipe(e.data.recipe);
-  }
-});
-
 // Initialization
 populateDropdowns();
 render();
