@@ -120,10 +120,12 @@
     background: none;
     border: none;
     cursor: pointer;
-    font-size: 14px;
-    margin-right: 8px;
+    font-size: 15px;
     line-height: 1;
+    padding: 2px 6px;
+    border-radius: 4px;
   }
+  .fav-star:hover { background: var(--surface2); }
 
   .open-bar { display: flex; align-items: center; gap: 12px; padding-top: 12px; flex-wrap: wrap; }
   
@@ -176,6 +178,7 @@
       <select id="protFilter"><option value="">All Proteins</option></select>
     </div>
     <div class="filter-actions">
+      <button class="btn btn-ghost" id="favFilterBtn">⭐ Favorites</button>
       <button class="btn btn-ghost" id="clearBtn">Clear Filters</button>
     </div>
   </div>
@@ -191,11 +194,12 @@
       <table>
         <thead>
           <tr>
+            <th style="width: 50px; text-align: center;">Fav</th>
             <th>Title</th>
             <th>Category</th>
             <th>Protein</th>
             <th>Date Added</th>
-            <th></th>
+            <th style="width: 40px;"></th>
           </tr>
         </thead>
         <tbody id="tbody"></tbody>
@@ -237,6 +241,7 @@
 <script>
 // State Management
 let recipes = JSON.parse(localStorage.getItem('my_recipes')) || [];
+let favOnly = false;
 
 // DOM Elements
 const tbody = document.getElementById('tbody');
@@ -245,6 +250,7 @@ const qInput = document.getElementById('q');
 const searchBtn = document.getElementById('searchBtn');
 const catSelect = document.getElementById('catFilter');
 const protSelect = document.getElementById('protFilter');
+const favFilterBtn = document.getElementById('favFilterBtn');
 const clearBtn = document.getElementById('clearBtn');
 const syncStatus = document.getElementById('syncStatus');
 
@@ -301,6 +307,7 @@ function render() {
   const prot = protSelect.value;
 
   const filtered = recipes.filter(r => {
+    if (favOnly && !r.favorite) return false;
     if (cat && r.category !== cat) return false;
     if (prot && r.protein !== prot) return false;
     if (q && !r.title.toLowerCase().includes(q)) return false;
@@ -315,14 +322,14 @@ function render() {
     const star = r.favorite ? '⭐' : '☆';
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td>
+      <td style="text-align: center;">
         <button class="fav-star" onclick="toggleFavorite(${origIdx})" title="Toggle Favorite">${star}</button>
-        <a href="${r.url}" target="_blank" style="color:inherit;text-decoration:none;">${r.title}</a>
       </td>
+      <td><a href="${r.url}" target="_blank" style="color:inherit;text-decoration:none;">${r.title}</a></td>
       <td>${r.category || 'Uncategorized'}</td>
       <td>${r.protein || 'N/A'}</td>
       <td style="color:var(--text-muted); font-size:12px;">${r.added || ''}</td>
-      <td><button onclick="deleteRecipe(${origIdx})" style="background:none;border:none;color:#e05555;cursor:pointer;">✕</button></td>
+      <td><button onclick="deleteRecipe(${origIdx})" style="background:none;border:none;color:#e05555;cursor:pointer;" title="Delete">✕</button></td>
     `;
     tbody.appendChild(tr);
   });
@@ -351,10 +358,20 @@ qInput.addEventListener('keypress', (e) => {
 catSelect.addEventListener('change', render);
 protSelect.addEventListener('change', render);
 
+favFilterBtn.addEventListener('click', () => {
+  favOnly = !favOnly;
+  favFilterBtn.classList.toggle('btn-primary', favOnly);
+  favFilterBtn.classList.toggle('btn-ghost', !favOnly);
+  render();
+});
+
 clearBtn.addEventListener('click', () => {
   qInput.value = '';
   catSelect.value = '';
   protSelect.value = '';
+  favOnly = false;
+  favFilterBtn.classList.remove('btn-primary');
+  favFilterBtn.classList.add('btn-ghost');
   render();
 });
 
