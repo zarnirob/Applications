@@ -177,7 +177,7 @@
       <label>Search title</label>
       <div class="search-box-row">
         <input type="text" id="q" placeholder="Search recipes…" autocomplete="off">
-        <button class="btn btn-primary" id="searchBtn" style="padding: 7px 14px;">🔍 Search</button>
+        <button type="button" class="btn btn-primary" id="searchBtn" style="padding: 7px 14px;">🔍 Search</button>
       </div>
     </div>
     <div class="filter-group">
@@ -189,9 +189,9 @@
       <select id="protFilter"><option value="">All Proteins</option></select>
     </div>
     <div class="filter-actions">
-      <button class="btn btn-primary" id="openSelectedBtn">🚀 Open Selected (0)</button>
-      <button class="btn btn-ghost" id="favFilterBtn">⭐ Favorites Only</button>
-      <button class="btn btn-ghost" id="clearBtn">Clear Filters</button>
+      <button type="button" class="btn btn-primary" id="openSelectedBtn">🚀 Open Selected (0)</button>
+      <button type="button" class="btn btn-ghost" id="favFilterBtn">⭐ Favorites Only</button>
+      <button type="button" class="btn btn-ghost" id="clearBtn">Clear Filters</button>
     </div>
   </div>
 
@@ -220,9 +220,9 @@
     </div>
 
     <div class="open-bar">
-      <button class="btn btn-primary" id="openGhToggle">🐙 GitHub Cloud Sync Settings</button>
-      <button class="btn btn-ghost" id="fetchGhBtn">⬇ Fetch from GitHub</button>
-      <button class="btn btn-ghost" id="pushGhBtn">⬆ Commit & Save to GitHub</button>
+      <button type="button" class="btn btn-primary" id="openGhToggle">🐙 GitHub Cloud Sync Settings</button>
+      <button type="button" class="btn btn-ghost" id="fetchGhBtn">⬇ Fetch from GitHub</button>
+      <button type="button" class="btn btn-ghost" id="pushGhBtn">⬆ Commit & Save to GitHub</button>
     </div>
 
     <!-- GitHub Sync Credentials Drawer -->
@@ -245,7 +245,7 @@
           <label>Personal Access Token (PAT)</label>
           <input type="password" id="ghToken" placeholder="github_pat_...">
         </div>
-        <button class="btn btn-primary" id="saveGhConfig">Save Settings</button>
+        <button type="button" class="btn btn-primary" id="saveGhConfig">Save Settings</button>
       </div>
     </div>
   </div>
@@ -395,13 +395,13 @@ function render() {
         <input type="checkbox" class="row-select" data-url="${encodeURIComponent(r.url)}">
       </td>
       <td style="text-align: center;">
-        <button class="${starClass}" onclick="toggleFavorite(${origIdx})" title="Toggle Favorite">${starIcon}</button>
+        <button type="button" class="${starClass}" onclick="toggleFavorite(${origIdx})" title="Toggle Favorite">${starIcon}</button>
       </td>
       <td><a href="${r.url}" target="_blank" style="color:inherit;text-decoration:none;">${r.title}</a></td>
       <td>${r.category || 'Uncategorized'}</td>
       <td>${r.protein || 'N/A'}</td>
       <td style="color:var(--text-muted); font-size:12px;">${r.added || ''}</td>
-      <td><button onclick="deleteRecipe(${origIdx})" style="background:none;border:none;color:#e05555;cursor:pointer;" title="Delete Recipe">✕</button></td>
+      <td><button type="button" onclick="deleteRecipe(${origIdx})" style="background:none;border:none;color:#e05555;cursor:pointer;" title="Delete Recipe">✕</button></td>
     `;
     tbody.appendChild(tr);
   });
@@ -423,26 +423,43 @@ selectAll.addEventListener('change', (e) => {
   updateSelectedCount();
 });
 
-// Bulk Open Selected Tabs
-openSelectedBtn.addEventListener('click', () => {
+// Bulk Open Selected Tabs (Staggered to bypass pop-up blocker locks)
+let isOpening = false;
+openSelectedBtn.addEventListener('click', (e) => {
+  if (isOpening) return;
+
   const checkedBoxes = Array.from(tbody.querySelectorAll('.row-select:checked'));
-  let urlsToOpen = [];
+  let rawUrls = [];
 
   if (checkedBoxes.length > 0) {
-    urlsToOpen = checkedBoxes.map(cb => decodeURIComponent(cb.dataset.url));
+    rawUrls = checkedBoxes.map(cb => decodeURIComponent(cb.dataset.url));
   } else if (currentFilteredRecipes.length > 0) {
-    // If no checkboxes checked, offer to open all visible filtered results
     if (confirm(`No individual recipes checked. Do you want to open all ${currentFilteredRecipes.length} visible recipe(s)?`)) {
-      urlsToOpen = currentFilteredRecipes.map(r => r.url);
+      rawUrls = currentFilteredRecipes.map(r => r.url);
     }
   } else {
     alert("No recipes available to open.");
     return;
   }
 
-  urlsToOpen.forEach(url => {
-    if (url) window.open(url, '_blank');
-  });
+  // Unique URLs only
+  const uniqueUrls = [...new Set(rawUrls.map(u => String(u || '').trim()).filter(Boolean))];
+
+  if (uniqueUrls.length === 0) return;
+
+  isOpening = true;
+
+  // Open first tab immediately under explicit click context
+  window.open(uniqueUrls[0], '_blank');
+
+  // Stagger subsequent tabs by 150ms so Firefox allows them cleanly
+  for (let i = 1; i < uniqueUrls.length; i++) {
+    setTimeout(() => {
+      window.open(uniqueUrls[i], '_blank');
+    }, i * 150);
+  }
+
+  setTimeout(() => { isOpening = false; }, uniqueUrls.length * 150 + 200);
 });
 
 function toggleFavorite(idx) {
