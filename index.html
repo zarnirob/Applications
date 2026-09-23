@@ -90,7 +90,7 @@
     gap: 6px;
   }
 
-  .filter-actions { display: flex; gap: 8px; margin-left: auto; }
+  .filter-actions { display: flex; gap: 8px; margin-left: auto; align-items: flex-end; }
   .btn {
     border: none;
     border-radius: var(--radius);
@@ -115,6 +115,14 @@
   tbody tr { border-bottom: 1px solid rgba(255,255,255,0.04); }
   tbody tr:hover { background: var(--row-hover); }
   td { padding: 9px 14px; }
+
+  /* Checkbox styling */
+  input[type="checkbox"] {
+    accent-color: var(--accent);
+    cursor: pointer;
+    width: 15px;
+    height: 15px;
+  }
 
   .fav-star {
     background: none;
@@ -181,6 +189,7 @@
       <select id="protFilter"><option value="">All Proteins</option></select>
     </div>
     <div class="filter-actions">
+      <button class="btn btn-primary" id="openSelectedBtn">🚀 Open Selected (0)</button>
       <button class="btn btn-ghost" id="favFilterBtn">⭐ Favorites Only</button>
       <button class="btn btn-ghost" id="clearBtn">Clear Filters</button>
     </div>
@@ -197,6 +206,7 @@
       <table>
         <thead>
           <tr>
+            <th style="width: 40px; text-align: center;"><input type="checkbox" id="selectAll" title="Select All Visible"></th>
             <th style="width: 70px; text-align: center;">Favorite</th>
             <th>Title</th>
             <th>Category</th>
@@ -264,6 +274,7 @@ let recipes = rawRecipes.map(r => ({
   added: r.added || new Date().toISOString().split('T')[0]
 }));
 
+let currentFilteredRecipes = [];
 let favOnly = false;
 
 // DOM Elements
@@ -275,6 +286,8 @@ const catSelect = document.getElementById('catFilter');
 const protSelect = document.getElementById('protFilter');
 const favFilterBtn = document.getElementById('favFilterBtn');
 const clearBtn = document.getElementById('clearBtn');
+const openSelectedBtn = document.getElementById('openSelectedBtn');
+const selectAll = document.getElementById('selectAll');
 const syncStatus = document.getElementById('syncStatus');
 
 // GitHub Credentials Elements
@@ -342,12 +355,18 @@ function saveData() {
   localStorage.setItem('my_recipes', JSON.stringify(recipes));
 }
 
+function updateSelectedCount() {
+  const checkboxes = tbody.querySelectorAll('.row-select:checked');
+  const count = checkboxes.length;
+  openSelectedBtn.textContent = `🚀 Open Selected (${count})`;
+}
+
 function render() {
   const q = qInput.value.toLowerCase().trim();
   const cat = catSelect.value;
   const prot = protSelect.value;
 
-  const filtered = recipes.filter(r => {
+  currentFilteredRecipes = recipes.filter(r => {
     if (favOnly && !r.favorite) return false;
     if (cat && r.category !== cat) return false;
     if (prot && r.protein !== prot) return false;
@@ -356,9 +375,10 @@ function render() {
   });
 
   tbody.innerHTML = '';
-  countLabel.innerHTML = `Showing <strong>${filtered.length}</strong> recipes`;
+  countLabel.innerHTML = `Showing <strong>${currentFilteredRecipes.length}</strong> recipes`;
+  selectAll.checked = false;
 
-  filtered.forEach((r) => {
+  currentFilteredRecipes.forEach((r) => {
     const origIdx = recipes.indexOf(r);
     const isFav = !!r.favorite;
     const starIcon = isFav ? '⭐' : '☆';
@@ -366,6 +386,9 @@ function render() {
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
+      <td style="text-align: center;">
+        <input type="checkbox" class="row-select" data-url="${encodeURIComponent(r.url)}">
+      </td>
       <td style="text-align: center;">
         <button class="${starClass}" onclick="toggleFavorite(${origIdx})" title="Toggle Favorite">${starIcon}</button>
       </td>
@@ -377,7 +400,45 @@ function render() {
     `;
     tbody.appendChild(tr);
   });
+
+  // Attach checkbox listener for dynamic open count
+  tbody.querySelectorAll('.row-select').forEach(cb => {
+    cb.addEventListener('change', updateSelectedCount);
+  });
+
+  updateSelectedCount();
 }
+
+// Master Checkbox "Select All"
+selectAll.addEventListener('change', (e) => {
+  const isChecked = e.target.checked;
+  tbody.querySelectorAll('.row-select').forEach(cb => {
+    cb.checked = isChecked;
+  });
+  updateSelectedCount();
+});
+
+// Bulk Open Selected Tabs
+openSelectedBtn.addEventListener('click', () => {
+  const checkedBoxes = Array.from(tbody.querySelectorAll('.row-select:checked'));
+  let urlsToOpen = [];
+
+  if (checkedBoxes.length > 0) {
+    urlsToOpen = checkedBoxes.map(cb => decodeURIComponent(cb.dataset.url));
+  } else if (currentFilteredRecipes.length > 0) {
+    // If no checkboxes checked, offer to open all visible filtered results
+    if (confirm(`No individual recipes checked. Do you want to open all ${currentFilteredRecipes.length} visible recipe(s)?`)) {
+      urlsToOpen = currentFilteredRecipes.map(r => r.url);
+    }
+  } else {
+    alert("No recipes available to open.");
+    return;
+  }
+
+  urlsToOpen.forEach(url => {
+    if (url) window.open(url, '_blank');
+  });
+});
 
 function toggleFavorite(idx) {
   if (recipes[idx]) {
