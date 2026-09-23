@@ -231,15 +231,15 @@
       <div class="gh-row">
         <div class="gh-field">
           <label>Owner / Username</label>
-          <input type="text" id="ghOwner" placeholder="zarnirob">
+          <input type="text" id="ghOwner" value="zarnirob" placeholder="zarnirob">
         </div>
         <div class="gh-field">
           <label>Repository Name</label>
-          <input type="text" id="ghRepo" placeholder="Applications">
+          <input type="text" id="ghRepo" value="Applications" placeholder="Applications">
         </div>
         <div class="gh-field">
           <label>File Path in Repo</label>
-          <input type="text" id="ghPath" placeholder="data/recipes.csv">
+          <input type="text" id="ghPath" value="data/recipes.csv" placeholder="data/recipes.csv">
         </div>
         <div class="gh-field">
           <label>Personal Access Token (PAT)</label>
@@ -302,11 +302,16 @@ const ghRepo = document.getElementById('ghRepo');
 const ghPath = document.getElementById('ghPath');
 const ghToken = document.getElementById('ghToken');
 
-// Load stored GitHub Config with 'zarnirob' and 'Applications' defaults
-ghOwner.value = cleanAscii(localStorage.getItem('gh_owner')) || 'zarnirob';
-ghRepo.value = cleanAscii(localStorage.getItem('gh_repo')) || 'Applications';
-ghPath.value = cleanAscii(localStorage.getItem('gh_path')) || 'data/recipes.csv';
-ghToken.value = cleanAscii(localStorage.getItem('gh_token'));
+// Load stored GitHub Config or force absolute defaults if localStorage is empty/cleared
+const storedOwner = cleanAscii(localStorage.getItem('gh_owner'));
+const storedRepo = cleanAscii(localStorage.getItem('gh_repo'));
+const storedPath = cleanAscii(localStorage.getItem('gh_path'));
+const storedToken = cleanAscii(localStorage.getItem('gh_token'));
+
+ghOwner.value = storedOwner ? storedOwner : 'zarnirob';
+ghRepo.value = storedRepo ? storedRepo : 'Applications';
+ghPath.value = storedPath ? storedPath : 'data/recipes.csv';
+ghToken.value = storedToken ? storedToken : '';
 
 openGhToggle.addEventListener('click', () => {
   ghPanel.style.display = ghPanel.style.display === 'none' ? 'flex' : 'none';
