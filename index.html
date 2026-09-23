@@ -231,11 +231,11 @@
       <div class="gh-row">
         <div class="gh-field">
           <label>Owner / Username</label>
-          <input type="text" id="ghOwner" placeholder="e.g. myusername">
+          <input type="text" id="ghOwner" placeholder="zarnirob">
         </div>
         <div class="gh-field">
           <label>Repository Name</label>
-          <input type="text" id="ghRepo" placeholder="e.g. my-recipes">
+          <input type="text" id="ghRepo" placeholder="Applications">
         </div>
         <div class="gh-field">
           <label>File Path in Repo</label>
@@ -302,9 +302,9 @@ const ghRepo = document.getElementById('ghRepo');
 const ghPath = document.getElementById('ghPath');
 const ghToken = document.getElementById('ghToken');
 
-// Load stored GitHub Config
-ghOwner.value = cleanAscii(localStorage.getItem('gh_owner'));
-ghRepo.value = cleanAscii(localStorage.getItem('gh_repo'));
+// Load stored GitHub Config with 'zarnirob' and 'Applications' defaults
+ghOwner.value = cleanAscii(localStorage.getItem('gh_owner')) || 'zarnirob';
+ghRepo.value = cleanAscii(localStorage.getItem('gh_repo')) || 'Applications';
 ghPath.value = cleanAscii(localStorage.getItem('gh_path')) || 'data/recipes.csv';
 ghToken.value = cleanAscii(localStorage.getItem('gh_token'));
 
@@ -313,8 +313,8 @@ openGhToggle.addEventListener('click', () => {
 });
 
 saveGhConfig.addEventListener('click', () => {
-  const cleanOwner = cleanAscii(ghOwner.value);
-  const cleanRepository = cleanAscii(ghRepo.value);
+  const cleanOwner = cleanAscii(ghOwner.value) || 'zarnirob';
+  const cleanRepository = cleanAscii(ghRepo.value) || 'Applications';
   const cleanFilePath = cleanAscii(ghPath.value) || 'data/recipes.csv';
   const cleanPAT = cleanAscii(ghToken.value);
 
@@ -494,9 +494,9 @@ function utf8ToBase64(str) {
 
 // ── DYNAMIC GITHUB API IMPORT (FETCH) ──
 async function fetchFromGitHub() {
-  const owner = cleanAscii(localStorage.getItem('gh_owner'));
-  const repo = cleanAscii(localStorage.getItem('gh_repo'));
-  const path = cleanAscii(localStorage.getItem('gh_path'));
+  const owner = cleanAscii(localStorage.getItem('gh_owner')) || 'zarnirob';
+  const repo = cleanAscii(localStorage.getItem('gh_repo')) || 'Applications';
+  const path = cleanAscii(localStorage.getItem('gh_path')) || 'data/recipes.csv';
   const token = cleanAscii(localStorage.getItem('gh_token'));
 
   if (!owner || !repo || !path) {
@@ -581,9 +581,9 @@ async function fetchFromGitHub() {
 
 // ── DYNAMIC GITHUB API EXPORT (SAVE) ──
 async function pushToGitHub() {
-  const owner = cleanAscii(localStorage.getItem('gh_owner'));
-  const repo = cleanAscii(localStorage.getItem('gh_repo'));
-  const path = cleanAscii(localStorage.getItem('gh_path'));
+  const owner = cleanAscii(localStorage.getItem('gh_owner')) || 'zarnirob';
+  const repo = cleanAscii(localStorage.getItem('gh_repo')) || 'Applications';
+  const path = cleanAscii(localStorage.getItem('gh_path')) || 'data/recipes.csv';
   const token = cleanAscii(localStorage.getItem('gh_token'));
 
   if (!owner || !repo || !path || !token) {
