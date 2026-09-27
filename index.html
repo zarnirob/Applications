@@ -329,10 +329,16 @@
     return localStorage.getItem('github_pat') || document.getElementById('patInput').value.trim();
   }
 
-  function utf8B64Decode(str) {
-    return decodeURIComponent(Array.prototype.map.call(atob(str), function(c) {
-      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-    }).join(''));
+  // Safe Base64 UTF-8 decoding without URI malformed exceptions
+  function safeB64Decode(b64) {
+    try {
+      const binString = atob(b64);
+      const bytes = Uint8Array.from(binString, (m) => m.codePointAt(0));
+      return new TextDecoder().decode(bytes);
+    } catch (e) {
+      console.error("Base64 decode error:", e);
+      return "";
+    }
   }
 
   function fetchGitHubData() {
@@ -348,7 +354,7 @@
       })
       .then(data => {
         fileSHA = data.sha;
-        const decodedContent = utf8B64Decode(data.content.replace(/\s/g, ''));
+        const decodedContent = safeB64Decode(data.content.replace(/\s/g, ''));
         parseCSV(decodedContent);
         renderTable();
       })
@@ -364,20 +370,21 @@
   }
 
   function parseCSV(text) {
+    if (!text) return;
     const lines = text.trim().split('\n');
     recipes = [];
     const categories = new Set();
 
     for (let i = 1; i < lines.length; i++) {
-      if (!lines[i]) continue;
-      
-      // Robust CSV splitting respecting quotes
+      const line = lines[i].trim();
+      if (!line) continue;
+
       const row = [];
       let insideQuote = false;
       let entry = '';
       
-      for (let c = 0; c < lines[i].length; c++) {
-        const char = lines[i][c];
+      for (let c = 0; c < line.length; c++) {
+        const char = line[c];
         if (char === '"') {
           insideQuote = !insideQuote;
         } else if (char === ',' && !insideQuote) {
