@@ -145,6 +145,25 @@
   }
   .btn-ghost:hover { color: var(--text); border-color: var(--text-muted); }
 
+  /* ── Config / PAT Panel ─────────────────────────────────────── */
+  #configPanel {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 28px;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+  #configPanel input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    padding: 6px 10px;
+    outline: none;
+  }
+
   /* ── Results area ────────────────────────────────────────────── */
   .results-wrap {
     overflow: hidden;
@@ -307,6 +326,7 @@
     align-items: center;
     gap: 12px;
     padding-top: 12px;
+    flex-wrap: wrap;
   }
   .open-bar .hint {
     font-size: 12px;
@@ -576,8 +596,17 @@
     </div>
     <div class="filter-actions">
       <button class="btn btn-fav" id="favFilterBtn" title="Show favorites only">☆ Favorites</button>
+      <button class="btn btn-ghost" id="fetchGithubBtn">⬇ Fetch from GitHub</button>
+      <button class="btn btn-ghost" id="configToggleBtn">⚙️ PAT Settings</button>
       <button class="btn btn-ghost" id="clearBtn">Clear</button>
     </div>
+  </div>
+
+  <!-- PAT Settings Config Panel -->
+  <div id="configPanel" style="display:none;">
+    <label for="patInput"><strong>GitHub PAT:</strong></label>
+    <input type="password" id="patInput" placeholder="Paste github_pat_..." onchange="savePAT()">
+    <button class="btn btn-primary" onclick="savePAT()">Save Token</button>
   </div>
 
   <div class="results-wrap">
@@ -609,12 +638,14 @@
       <button class="btn btn-primary" id="openBtn" disabled>Open selected in tabs</button>
       <button class="btn btn-ghost" style="border-color: var(--green); color: var(--green);" id="groceryBtn">🛒 Grocery List</button>
       <button class="btn btn-ghost" id="addRecipeToggle">＋ Add Recipe</button>
-      <button class="btn btn-ghost" id="importBtn">⬆ Import CSV/Excel</button>
+      <button class="btn btn-ghost" style="border-color: var(--accent); color: var(--accent);" id="syncGithubBtn">💾 Save & Sync to GitHub</button>
+      <button class="btn btn-ghost" id="importBtn">⬆ Import CSV</button>
       <input type="file" id="importFileInput" accept=".csv" style="display:none">
-      <button class="btn btn-ghost" id="exportBtn">⬇ Export Excel</button>
+      <button class="btn btn-ghost" id="exportBtn">⬇ Export CSV</button>
       <span class="hint" id="openHint">Select one or more recipes, then click to open their links.</span>
     </div>
 
+    <!-- Add Recipe panel -->
     <div id="addPanel" style="display:none">
       <div class="link-panel-header">
         <span>Add a New Recipe</span>
@@ -648,6 +679,7 @@
       </div>
     </div>
 
+    <!-- Link panel: shown after clicking "Open selected in tabs" -->
     <div id="linkPanel" style="display:none">
       <div class="link-panel-header">
         <span id="linkPanelLabel"></span>
@@ -658,6 +690,7 @@
   </div>
 </div>
 
+<!-- Grocery Modal -->
 <div id="groceryModal" class="modal-overlay">
   <div class="modal-card">
     <h2 style="margin-top:0; color:var(--accent);">🛒 Generate Grocery List</h2>
@@ -684,8 +717,12 @@
 </div>
 
 <script>
-const INITIAL_RECIPES = [];
+// Initial Data & Repository Info
+const repoOwner = "zarnirob";
+const repoName = "Applications";
+const filePath = "data/recipes.csv";
 
+// App State
 let recipes = JSON.parse(localStorage.getItem('my_recipes')) || [];
 let favorites = new Set(JSON.parse(localStorage.getItem('my_fav_recipes') || "[]"));
 let selectedIndexes = new Set();
@@ -694,7 +731,9 @@ let lastDeletedRecipe = null;
 let lastDeletedIndex = null;
 let toastTimer = null;
 let formattedListText = "";
+let fileSHA = "";
 
+// DOM Elements
 const qInput = document.getElementById('q');
 const catSelect = document.getElementById('catFilter');
 const protSelect = document.getElementById('protFilter');
@@ -725,6 +764,14 @@ const undoMsg = document.getElementById('undoMsg');
 const undoBtn = document.getElementById('undoBtn');
 const headerSubtitle = document.getElementById('headerSubtitle');
 
+// GitHub & Config DOM Elements
+const configToggleBtn = document.getElementById('configToggleBtn');
+const configPanel = document.getElementById('configPanel');
+const patInput = document.getElementById('patInput');
+const fetchGithubBtn = document.getElementById('fetchGithubBtn');
+const syncGithubBtn = document.getElementById('syncGithubBtn');
+
+// Grocery DOM
 const groceryBtn = document.getElementById('groceryBtn');
 const groceryModal = document.getElementById('groceryModal');
 const ingredientInputs = document.getElementById('ingredientInputs');
@@ -734,6 +781,123 @@ const groceryResultSection = document.getElementById('groceryResultSection');
 const groceryPreview = document.getElementById('groceryPreview');
 const copyGroceryBtn = document.getElementById('copyGroceryBtn');
 
+/* PAT Settings Functions */
+function toggleConfig() {
+  configPanel.style.display = configPanel.style.display === 'none' ? 'flex' : 'none';
+}
+
+function savePAT() {
+  const pat = patInput.value.trim();
+  localStorage.setItem('github_pat', pat);
+  alert("PAT Token saved locally!");
+}
+
+function getPAT() {
+  return localStorage.getItem('github_pat') || patInput.value.trim();
+}
+
+function decodeUTF8Base64(b64) {
+  try {
+    return decodeURIComponent(escape(atob(b64.replace(/\s/g, ''))));
+  } catch (e) {
+    return atob(b64.replace(/\s/g, ''));
+  }
+}
+
+/* GitHub API Integration */
+function fetchGitHubData() {
+  const url = `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${filePath}?cache=` + Date.now();
+  const headers = {};
+  const pat = getPAT();
+  if (pat) headers['Authorization'] = `Bearer ${pat}`;
+
+  fetch(url, { headers })
+    .then(res => {
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return res.json();
+    })
+    .then(data => {
+      fileSHA = data.sha;
+      const decodedContent = decodeUTF8Base64(data.content);
+      parseCSV(decodedContent);
+      saveData();
+      populateDropdowns();
+      render();
+    })
+    .catch(err => {
+      console.warn("Direct API fetch failed, loading local storage or fallback:", err);
+    });
+}
+
+function saveToGitHub(commitMessage = "Dashboard sync") {
+  const pat = getPAT();
+  if (!pat) {
+    alert("Please configure your GitHub PAT Token in Settings first to sync changes.");
+    return;
+  }
+
+  let csvContent = 'Title,URL,Category,Protein\n';
+  recipes.forEach(r => {
+    const cleanTitle = (r.title || '').replace(/"/g, '""');
+    const cleanURL = (r.url || '').replace(/"/g, '""');
+    const cleanCat = (r.category || 'Uncategorized').replace(/"/g, '""');
+    const cleanProt = (r.protein || 'N/A').replace(/"/g, '""');
+    csvContent += `"${cleanTitle}","${cleanURL}","${cleanCat}","${cleanProt}"\n`;
+  });
+
+  const encodedContent = btoa(unescape(encodeURIComponent(csvContent)));
+
+  const payload = {
+    message: commitMessage,
+    content: encodedContent,
+    sha: fileSHA
+  };
+
+  fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/contents/${filePath}`, {
+    method: 'PUT',
+    headers: {
+      'Authorization': `Bearer ${pat}`,
+      'Content-Type': 'application/json',
+      'Accept': 'application/vnd.github+json'
+    },
+    body: JSON.stringify(payload)
+  })
+  .then(res => {
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    return res.json();
+  })
+  .then(data => {
+    fileSHA = data.content.sha;
+    alert("✓ Saved & synced to GitHub successfully!");
+  })
+  .catch(err => {
+    console.error("Error committing to GitHub:", err);
+    alert("Failed to sync with GitHub. Please check your PAT settings.");
+  });
+}
+
+function parseCSV(text) {
+  if (!text) return;
+  const lines = text.trim().split(/\r\n|\n/);
+  recipes = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line || (i === 0 && line.toLowerCase().includes('title'))) continue;
+
+    const cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.replace(/^"|"$/g, '').trim());
+    if (cols.length >= 2 && cols[0] && cols[1]) {
+      recipes.push({
+        title: cols[0],
+        url: cols[1],
+        category: cols[2] || 'Uncategorized',
+        protein: cols[3] || 'N/A'
+      });
+    }
+  }
+}
+
+// Setup Dropdown Options
 function populateDropdowns() {
   const cats = [...new Set(recipes.map(r => r.category).filter(Boolean))].sort();
   const prots = [...new Set(recipes.map(r => r.protein).filter(Boolean))].sort();
@@ -751,11 +915,13 @@ function populateDropdowns() {
   prots.forEach(p => addProtSelect.add(new Option(p, p)));
 }
 
+// Save Data
 function saveData() {
   localStorage.setItem('my_recipes', JSON.stringify(recipes));
   localStorage.setItem('my_fav_recipes', JSON.stringify([...favorites]));
 }
 
+// Filter and Render
 function getFilteredRecipes() {
   const q = qInput.value.toLowerCase().trim();
   const cat = catSelect.value;
@@ -978,6 +1144,11 @@ clearBtn.addEventListener('click', () => {
   render();
 });
 
+configToggleBtn.addEventListener('click', toggleConfig);
+fetchGithubBtn.addEventListener('click', fetchGitHubData);
+syncGithubBtn.addEventListener('click', () => saveToGitHub("Manual sync from dashboard"));
+
+// CSV Export
 exportBtn.addEventListener('click', () => {
   const visible = getFilteredRecipes();
   if (visible.length === 0) {
@@ -1003,6 +1174,7 @@ exportBtn.addEventListener('click', () => {
   document.body.removeChild(link);
 });
 
+// CSV Import
 importBtn.addEventListener('click', () => importFileInput.click());
 
 importFileInput.addEventListener('change', (e) => {
@@ -1012,36 +1184,17 @@ importFileInput.addEventListener('change', (e) => {
   const reader = new FileReader();
   reader.onload = (evt) => {
     const text = evt.target.result;
-    const lines = text.split(/\r\n|\n/);
-    let importedCount = 0;
-
-    lines.forEach((line, index) => {
-      if (index === 0 && line.toLowerCase().includes('title')) return;
-      const cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.replace(/^"\vert{}"$/g, '').trim());
-      if (cols.length >= 2 && cols[0] && cols[1]) {
-        recipes.unshift({
-          title: cols[0],
-          url: cols[1],
-          category: cols[2] || 'Uncategorized',
-          protein: cols[3] || 'N/A'
-        });
-        importedCount++;
-      }
-    });
-
-    if (importedCount > 0) {
-      saveData();
-      populateDropdowns();
-      render();
-      alert(`Successfully imported ${importedCount} recipes!`);
-    } else {
-      alert("No valid recipe rows found in the CSV file.");
-    }
+    parseCSV(text);
+    saveData();
+    populateDropdowns();
+    render();
+    alert("Successfully imported recipes from CSV!");
     importFileInput.value = '';
   };
   reader.readAsText(file);
 });
 
+/* GROCERY LIST GENERATOR LOGIC */
 groceryBtn.addEventListener('click', () => {
   const selectedRecipes = [...selectedIndexes].map(i => recipes[i]).filter(Boolean);
   if (selectedRecipes.length === 0) {
@@ -1131,6 +1284,7 @@ copyGroceryBtn.addEventListener('click', () => {
   });
 });
 
+/* Extension Communication Bridge */
 const browserAPI = typeof browser !== "undefined" ? browser : chrome;
 
 async function syncRecipesFromStorage() {
@@ -1158,8 +1312,13 @@ window.addEventListener("ExtensionAddRecipe", (e) => {
   }
 });
 
-populateDropdowns();
-render();
+/* Initialization */
+window.onload = function() {
+  const savedPAT = localStorage.getItem('github_pat');
+  if (savedPAT) patInput.value = savedPAT;
+  populateDropdowns();
+  render();
+};
 </script>
 </body>
 </html>
