@@ -150,6 +150,14 @@
       font-weight: 600;
     }
 
+    th.col-cb { width: 35px; text-align: center; }
+    th.col-fav { width: 45px; text-align: center; }
+    th.col-cat { width: 160px; }
+    th.col-prot { width: 130px; }
+    th.col-date { width: 110px; }
+
+    td.cell-center { text-align: center; }
+
     tr:last-child td {
       border-bottom: none;
     }
@@ -266,12 +274,12 @@
 <table>
   <thead>
     <tr>
-      <th><input type="checkbox" id="selectAll" onclick="toggleSelectAll(this)"></th>
-      <th>Fav</th>
+      <th class="col-cb"><input type="checkbox" id="selectAll" onclick="toggleSelectAll(this)"></th>
+      <th class="col-fav">Fav</th>
       <th>Title</th>
-      <th>Category</th>
-      <th>Protein</th>
-      <th>Added</th>
+      <th class="col-cat">Category</th>
+      <th class="col-prot">Protein</th>
+      <th class="col-date">Added</th>
     </tr>
   </thead>
   <tbody id="recipeTableBody">
@@ -279,7 +287,7 @@
   </tbody>
 </table>
 
-<!-- Bottom Action Bar (Restored Bottom Save/Sync Button) -->
+<!-- Bottom Action Bar -->
 <div class="bottom-bar">
   <button class="btn-success" style="padding: 10px 20px; font-size: 1rem;" onclick="manualSyncToGitHub()">💾 Save & Sync All Changes to GitHub</button>
 </div>
@@ -345,15 +353,14 @@
     return localStorage.getItem('github_pat') || document.getElementById('patInput').value.trim();
   }
 
-  // Safe Base64 decoding avoiding UTF-8 malformed string errors
-  function safeB64Decode(b64) {
+  // Cross-browser Base64 UTF-8 decoder
+  function decodeUTF8Base64(b64) {
     try {
-      const binString = atob(b64);
-      const bytes = Uint8Array.from(binString, (m) => m.codePointAt(0));
-      return new TextDecoder().decode(bytes);
+      const raw = atob(b64.replace(/\s/g, ''));
+      return decodeURIComponent(escape(raw));
     } catch (e) {
-      console.error("Base64 decode error:", e);
-      return "";
+      console.warn("UTF8 escape decode failed, using raw string:", e);
+      return atob(b64.replace(/\s/g, ''));
     }
   }
 
@@ -370,7 +377,7 @@
       })
       .then(data => {
         fileSHA = data.sha;
-        const decodedContent = safeB64Decode(data.content.replace(/\s/g, ''));
+        const decodedContent = decodeUTF8Base64(data.content);
         parseCSV(decodedContent);
         renderTable();
       })
@@ -450,8 +457,8 @@
 
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td><input type="checkbox" class="recipe-select" data-url="${safeURL}" data-title="${safeTitle}"></td>
-        <td><span class="star ${r.favorite ? 'active' : ''}" onclick="toggleFav(${idx})">★</span></td>
+        <td class="cell-center"><input type="checkbox" class="recipe-select" data-url="${safeURL}" data-title="${safeTitle}"></td>
+        <td class="cell-center"><span class="star ${r.favorite ? 'active' : ''}" onclick="toggleFav(${idx})">★</span></td>
         <td><a href="${r.url}" target="_blank" style="text-decoration:none; color:var(--primary); font-weight:500;">${r.title}</a></td>
         <td>${r.category}</td>
         <td>${r.protein}</td>
