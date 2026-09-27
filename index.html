@@ -177,7 +177,6 @@
       color: #f1c40f;
     }
 
-    /* Bottom Floating Action Bar */
     .bottom-bar {
       display: flex;
       justify-content: flex-end;
@@ -244,7 +243,7 @@
   <button class="btn-success" onclick="savePAT()">Save Token</button>
 </div>
 
-<!-- Inline Add Recipe Form (Top Bar) -->
+<!-- Inline Add Recipe Form -->
 <div class="add-form">
   <input type="text" id="newTitle" placeholder="Recipe Title">
   <input type="url" id="newURL" placeholder="Recipe URL">
@@ -353,13 +352,10 @@
     return localStorage.getItem('github_pat') || document.getElementById('patInput').value.trim();
   }
 
-  // Cross-browser Base64 UTF-8 decoder
   function decodeUTF8Base64(b64) {
     try {
-      const raw = atob(b64.replace(/\s/g, ''));
-      return decodeURIComponent(escape(raw));
+      return decodeURIComponent(escape(atob(b64.replace(/\s/g, ''))));
     } catch (e) {
-      console.warn("UTF8 escape decode failed, using raw string:", e);
       return atob(b64.replace(/\s/g, ''));
     }
   }
@@ -452,18 +448,51 @@
       if (cat && r.category !== cat) return;
       if (search && !r.title.toLowerCase().includes(search) && !r.url.toLowerCase().includes(search)) return;
 
-      const safeTitle = r.title.replace(/"/g, '&quot;');
-      const safeURL = r.url.replace(/"/g, '&quot;');
-
       const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td class="cell-center"><input type="checkbox" class="recipe-select" data-url="${safeURL}" data-title="${safeTitle}"></td>
-        <td class="cell-center"><span class="star ${r.favorite ? 'active' : ''}" onclick="toggleFav(${idx})">★</span></td>
-        <td><a href="${r.url}" target="_blank" style="text-decoration:none; color:var(--primary); font-weight:500;">${r.title}</a></td>
-        <td>${r.category}</td>
-        <td>${r.protein}</td>
-        <td>${r.added}</td>
-      `;
+
+      // Checkbox Cell (Direct DOM Assignment Prevents HTML Escaping Bugs)
+      const tdCb = document.createElement('td');
+      tdCb.className = 'cell-center';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.className = 'recipe-select';
+      cb.dataset.title = r.title;
+      cb.dataset.url = r.url;
+      tdCb.appendChild(cb);
+
+      // Star Cell
+      const tdFav = document.createElement('td');
+      tdFav.className = 'cell-center';
+      tdFav.innerHTML = `<span class="star ${r.favorite ? 'active' : ''}" onclick="toggleFav(${idx})">★</span>`;
+
+      // Title Link Cell
+      const tdTitle = document.createElement('td');
+      const a = document.createElement('a');
+      a.href = r.url;
+      a.target = '_blank';
+      a.style.textDecoration = 'none';
+      a.style.color = 'var(--primary)';
+      a.style.fontWeight = '500';
+      a.textContent = r.title;
+      tdTitle.appendChild(a);
+
+      // Category, Protein, Added Cells
+      const tdCat = document.createElement('td');
+      tdCat.textContent = r.category;
+
+      const tdProt = document.createElement('td');
+      tdProt.textContent = r.protein;
+
+      const tdAdded = document.createElement('td');
+      tdAdded.textContent = r.added;
+
+      tr.appendChild(tdCb);
+      tr.appendChild(tdFav);
+      tr.appendChild(tdTitle);
+      tr.appendChild(tdCat);
+      tr.appendChild(tdProt);
+      tr.appendChild(tdAdded);
+
       tbody.appendChild(tr);
     });
   }
@@ -577,7 +606,7 @@
     document.getElementById('groceryResultSection').style.display = 'none';
 
     selected.forEach((cb, idx) => {
-      const title = cb.dataset.title || cb.closest('tr').querySelector('a').textContent;
+      const title = cb.dataset.title;
       
       const div = document.createElement('div');
       div.style.marginBottom = '15px';
