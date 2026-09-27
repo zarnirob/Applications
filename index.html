@@ -7,15 +7,17 @@
   <style>
     :root {
       --primary: #2c3e50;
-      --accent: #3498db;
-      --bg: #f8f9fa;
+      --secondary: #34495e;
+      --accent: #e67e22;
+      --success: #27ae60;
+      --bg: #f4f6f7;
       --card-bg: #ffffff;
       --text: #333333;
-      --border: #e2e8f0;
+      --border: #dcdde1;
     }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
       background-color: var(--bg);
       color: var(--text);
       margin: 0;
@@ -23,17 +25,25 @@
     }
 
     header {
+      background-color: var(--primary);
+      color: white;
+      padding: 15px 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
       display: flex;
       flex-wrap: wrap;
       justify-content: space-between;
       align-items: center;
       gap: 15px;
-      margin-bottom: 20px;
-      padding-bottom: 15px;
-      border-bottom: 2px solid var(--border);
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     }
 
-    h1 { margin: 0; font-size: 1.8rem; color: var(--primary); }
+    h1 {
+      margin: 0;
+      font-size: 1.6rem;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
 
     .controls {
       display: flex;
@@ -44,38 +54,77 @@
 
     button, select, input {
       padding: 8px 12px;
-      border-radius: 6px;
-      border: 1px solid #cbd5e1;
+      border-radius: 5px;
+      border: 1px solid var(--border);
       font-size: 0.9rem;
+      outline: none;
     }
 
     button {
-      background-color: var(--primary);
+      background-color: var(--secondary);
       color: white;
       border: none;
       cursor: pointer;
       font-weight: 600;
-      transition: opacity 0.2s;
+      transition: background-color 0.2s, transform 0.1s;
     }
 
-    button:hover { opacity: 0.9; }
-    button.accent { background-color: var(--accent); }
+    button:hover {
+      background-color: #1a252f;
+    }
+
+    button:active {
+      transform: scale(0.98);
+    }
+
+    button.btn-accent {
+      background-color: var(--accent);
+    }
+
+    button.btn-accent:hover {
+      background-color: #d35400;
+    }
+
+    button.btn-success {
+      background-color: var(--success);
+    }
+
+    button.btn-success:hover {
+      background-color: #219150;
+    }
+
+    .config-panel {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      padding: 12px 18px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+
+    .config-panel input {
+      flex: 1;
+    }
 
     .add-form {
       display: flex;
       flex-wrap: wrap;
       gap: 10px;
       background: var(--card-bg);
+      border: 1px solid var(--border);
       padding: 15px;
       border-radius: 8px;
       margin-bottom: 20px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
       align-items: center;
     }
 
     .add-form input, .add-form select {
       flex: 1;
-      min-width: 130px;
+      min-width: 140px;
     }
 
     table {
@@ -84,7 +133,8 @@
       background: var(--card-bg);
       border-radius: 8px;
       overflow: hidden;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      border: 1px solid var(--border);
     }
 
     th, td {
@@ -93,23 +143,63 @@
       border-bottom: 1px solid var(--border);
     }
 
-    th { background-color: #edf2f7; color: var(--primary); font-weight: 600; }
-    tr:hover { background-color: #f1f5f9; }
-
-    .star { cursor: pointer; color: #cbd5e1; font-size: 1.2rem; }
-    .star.active { color: #f1c40f; }
-
-    .config-panel {
-      background: #edf2f7;
-      padding: 10px 15px;
-      border-radius: 6px;
-      margin-bottom: 15px;
-      display: flex;
-      gap: 10px;
-      align-items: center;
+    th {
+      background-color: #f1f2f6;
+      color: var(--primary);
+      font-weight: 600;
     }
 
-    .config-panel input { flex: 1; }
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    tr:hover {
+      background-color: #f8f9fa;
+    }
+
+    .star {
+      cursor: pointer;
+      color: #b2bec3;
+      font-size: 1.2rem;
+      user-select: none;
+    }
+
+    .star.active {
+      color: #f1c40f;
+    }
+
+    /* Modal Overlay Styles */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.5);
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+
+    .modal-card {
+      background: white;
+      padding: 25px;
+      border-radius: 10px;
+      max-width: 620px;
+      width: 90%;
+      max-height: 85vh;
+      overflow-y: auto;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    }
+
+    .grocery-preview {
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 6px;
+      font-family: monospace;
+      white-space: pre-wrap;
+      max-height: 250px;
+      overflow-y: auto;
+      border: 1px solid var(--border);
+    }
   </style>
 </head>
 <body>
@@ -123,8 +213,8 @@
     </select>
     <button id="favFilterBtn" onclick="toggleFavFilter()">⭐ Favorites Only</button>
     <button onclick="fetchGitHubData()">⬇ Fetch from GitHub</button>
-    <button class="accent" onclick="openSelectedTabs()">🚀 Open Selected</button>
-    <button class="accent" style="background-color: #27ae60;" onclick="generateGroceryList()">🛒 Grocery List</button>
+    <button class="btn-accent" onclick="openSelectedTabs()">🚀 Open Selected</button>
+    <button class="btn-success" onclick="generateGroceryList()">🛒 Grocery List</button>
     <button style="background-color: #7f8c8d;" onclick="toggleConfig()">⚙️ PAT Settings</button>
   </div>
 </header>
@@ -132,7 +222,7 @@
 <div id="configPanel" class="config-panel" style="display:none;">
   <label for="patInput"><strong>GitHub PAT:</strong></label>
   <input type="password" id="patInput" placeholder="Paste github_pat_..." onchange="savePAT()">
-  <button onclick="savePAT()">Save Token</button>
+  <button class="btn-success" onclick="savePAT()">Save Token</button>
 </div>
 
 <!-- Inline Add Recipe Form -->
@@ -159,7 +249,7 @@
     <option value="Seafood">Seafood</option>
     <option value="Vegetarian">Vegetarian</option>
   </select>
-  <button class="accent" style="background-color: #27ae60;" onclick="addRecipe()">➕ Add Recipe</button>
+  <button class="btn-success" onclick="addRecipe()">➕ Add Recipe</button>
 </div>
 
 <table>
@@ -178,23 +268,23 @@
   </tbody>
 </table>
 
-<!-- Grocery List Modal Overlay -->
-<div id="groceryModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); justify-content:center; align-items:center; z-index:1000;">
-  <div style="background:white; padding:25px; border-radius:12px; max-width:600px; width:90%; max-height:85vh; overflow-y:auto; box-shadow:0 10px 25px rgba(0,0,0,0.2); font-family: sans-serif;">
-    <h2 style="margin-top:0; color:#2c3e50;">🛒 Generate Grocery List</h2>
+<!-- Grocery Modal -->
+<div id="groceryModal" class="modal-overlay">
+  <div class="modal-card">
+    <h2 style="margin-top:0; color:var(--primary);">🛒 Generate Grocery List</h2>
     <p style="font-size: 0.9rem; color: #666;">Paste or review ingredients for your selected recipes below:</p>
     
     <div id="ingredientInputs"></div>
 
     <div style="display: flex; gap: 10px; margin-top: 15px;">
-      <button style="background-color:#2c3e50; color:white; padding:8px 15px; border:none; border-radius:5px; font-weight:bold; cursor:pointer;" onclick="buildFinalGroceryList()">Build Formatted List</button>
-      <button style="background-color:#95a5a6; color:white; padding:8px 15px; border:none; border-radius:5px; cursor:pointer;" onclick="closeGroceryModal()">Cancel</button>
+      <button class="btn-accent" onclick="buildFinalGroceryList()">Build Formatted List</button>
+      <button style="background-color:#95a5a6;" onclick="closeGroceryModal()">Cancel</button>
     </div>
 
     <div id="groceryResultSection" style="display:none; margin-top:20px;">
       <h3>Preview & Copy</h3>
-      <div id="groceryPreview" style="background:#f1f5f9; padding:15px; border-radius:6px; font-family:monospace; white-space:pre-wrap; max-height:250px; overflow-y:auto; border:1px solid #cbd5e1;"></div>
-      <button style="background-color: #27ae60; color:white; padding:10px; border:none; border-radius:5px; font-weight:bold; width:100%; margin-top:10px; cursor:pointer;" onclick="copyGroceryToClipboard()">📋 Copy for Shared Notes</button>
+      <div id="groceryPreview" class="grocery-preview"></div>
+      <button class="btn-success" style="width:100%; margin-top:10px;" onclick="copyGroceryToClipboard()">📋 Copy for Shared Notes</button>
     </div>
   </div>
 </div>
@@ -213,7 +303,7 @@
     if (savedPAT) document.getElementById('patInput').value = savedPAT;
     fetchGitHubData();
     
-    // CustomEvent Listener for Firefox Extension Bridge
+    // Extension Communication Bridge
     window.addEventListener('ADD_RECIPE_EVENT', function(e) {
       if (e.detail) {
         document.getElementById('newTitle').value = e.detail.title || '';
@@ -252,7 +342,6 @@
       })
       .then(data => {
         fileSHA = data.sha;
-        // Decode Base64 UTF-8 string from GitHub
         const decodedContent = decodeURIComponent(escape(atob(data.content.replace(/\s/g, ''))));
         parseCSV(decodedContent);
         renderTable();
@@ -326,7 +415,7 @@
 
   function toggleFavFilter() {
     favOnly = !favOnly;
-    document.getElementById('favFilterBtn').style.backgroundColor = favOnly ? '#f1c40f' : 'var(--primary)';
+    document.getElementById('favFilterBtn').style.backgroundColor = favOnly ? '#f1c40f' : 'var(--secondary)';
     renderTable();
   }
 
@@ -383,7 +472,6 @@
       csvContent += `"${cleanTitle}","${r.url}","${r.category}","${r.protein}","${r.favorite}","${r.added}"\n`;
     });
 
-    // Encode Base64 UTF-8 properly for GitHub REST API
     const encodedContent = btoa(unescape(encodeURIComponent(csvContent)));
 
     const payload = {
@@ -411,7 +499,7 @@
     })
     .catch(err => {
       console.error("Error committing to GitHub:", err);
-      alert("Failed to sync with GitHub. Please check your PAT settings and console.");
+      alert("Failed to sync with GitHub. Please check your PAT settings.");
     });
   }
 
@@ -433,8 +521,8 @@
       const div = document.createElement('div');
       div.style.marginBottom = '15px';
       div.innerHTML = `
-        <label style="font-weight:bold; display:block; margin-bottom:5px; color:#2c3e50;">${title}</label>
-        <textarea id="ing-${idx}" data-title="${title}" placeholder="Paste ingredients for ${title}..." style="width:100%; height:70px; box-sizing:border-box; padding:8px; border-radius:4px; border:1px solid #ccc; font-family:sans-serif;"></textarea>
+        <label style="font-weight:bold; display:block; margin-bottom:5px; color:var(--primary);">${title}</label>
+        <textarea id="ing-${idx}" data-title="${title}" placeholder="Paste ingredients for ${title}..." style="width:100%; height:70px; box-sizing:border-box; padding:8px; border-radius:5px; border:1px solid var(--border); font-family:sans-serif;"></textarea>
       `;
       container.appendChild(div);
     });
@@ -471,7 +559,7 @@
       recipeNames.push(ta.dataset.title);
       const lines = ta.value.split('\n');
       lines.forEach(line => {
-        const clean = line.trim().replace(/^[-*•\d+\.]+\s*/, ''); // Strip bullets/numbers
+        const clean = line.trim().replace(/^[-*•\d+\.]+\s*/, '');
         if (clean) {
           const cat = categorizeIngredient(clean);
           if (!categories[cat].includes(clean)) {
