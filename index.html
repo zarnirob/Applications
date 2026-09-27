@@ -135,6 +135,7 @@
       overflow: hidden;
       box-shadow: 0 1px 3px rgba(0,0,0,0.05);
       border: 1px solid var(--border);
+      margin-bottom: 20px;
     }
 
     th, td {
@@ -166,6 +167,16 @@
 
     .star.active {
       color: #f1c40f;
+    }
+
+    /* Bottom Floating Action Bar */
+    .bottom-bar {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 15px;
+      padding-top: 15px;
+      border-top: 1px solid var(--border);
     }
 
     /* Modal Overlay Styles */
@@ -225,7 +236,7 @@
   <button class="btn-success" onclick="savePAT()">Save Token</button>
 </div>
 
-<!-- Inline Add Recipe Form -->
+<!-- Inline Add Recipe Form (Top Bar) -->
 <div class="add-form">
   <input type="text" id="newTitle" placeholder="Recipe Title">
   <input type="url" id="newURL" placeholder="Recipe URL">
@@ -267,6 +278,11 @@
     <!-- Rows rendered dynamically -->
   </tbody>
 </table>
+
+<!-- Bottom Action Bar (Restored Bottom Save/Sync Button) -->
+<div class="bottom-bar">
+  <button class="btn-success" style="padding: 10px 20px; font-size: 1rem;" onclick="manualSyncToGitHub()">💾 Save & Sync All Changes to GitHub</button>
+</div>
 
 <!-- Grocery Modal -->
 <div id="groceryModal" class="modal-overlay">
@@ -329,7 +345,7 @@
     return localStorage.getItem('github_pat') || document.getElementById('patInput').value.trim();
   }
 
-  // Safe Base64 UTF-8 decoding without URI malformed exceptions
+  // Safe Base64 decoding avoiding UTF-8 malformed string errors
   function safeB64Decode(b64) {
     try {
       const binString = atob(b64);
@@ -493,6 +509,10 @@
     saveToGitHub(`Add recipe: ${title}`);
   }
 
+  function manualSyncToGitHub() {
+    saveToGitHub("Manual dashboard sync");
+  }
+
   function saveToGitHub(commitMessage) {
     const pat = getPAT();
     if (!pat) {
@@ -529,7 +549,7 @@
     })
     .then(data => {
       fileSHA = data.content.sha;
-      console.log("✓ Saved to GitHub successfully!");
+      alert("✓ Saved & synced to GitHub successfully!");
     })
     .catch(err => {
       console.error("Error committing to GitHub:", err);
