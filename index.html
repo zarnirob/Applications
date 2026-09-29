@@ -1409,12 +1409,21 @@ window.addEventListener('ExtensionAddRecipe', (e) => {
     localStorage.setItem(key, data.ingredients.join('\n'));
     // Clean the hash from the URL without reloading
     history.replaceState(null, '', location.pathname + location.search);
-    // Show a toast-style confirmation
-    var toast = document.createElement('div');
-    toast.style.cssText = 'position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:#2e2e29;border:1px solid #5a9e6a;border-radius:24px;padding:10px 22px;font-size:13px;color:#e8e4da;z-index:9999;box-shadow:0 4px 24px rgba(0,0,0,0.5);white-space:nowrap;';
-    toast.textContent = '\u2713 ' + data.ingredients.length + ' ingredients saved for: ' + data.title.slice(0, 50);
-    document.body.appendChild(toast);
-    setTimeout(function(){ toast.remove(); }, 5000);
+    // Auto-select the matching recipe by URL, then open grocery modal
+    var matchIdx = recipes.findIndex(function(r) { return r.url === data.url; });
+    if (matchIdx !== -1) {
+      selectedIndexes.add(matchIdx);
+      render();
+      // Small delay so the table renders selected state before modal opens
+      setTimeout(function() { groceryBtn.click(); }, 200);
+    } else {
+      // Recipe not in dashboard yet — just show toast
+      var toast = document.createElement('div');
+      toast.style.cssText = 'position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:#2e2e29;border:1px solid #5a9e6a;border-radius:24px;padding:10px 22px;font-size:13px;color:#e8e4da;z-index:9999;box-shadow:0 4px 24px rgba(0,0,0,0.5);white-space:nowrap;';
+      toast.textContent = '\u2713 ' + data.ingredients.length + ' ingredients saved — select the recipe and open Grocery List';
+      document.body.appendChild(toast);
+      setTimeout(function(){ toast.remove(); }, 6000);
+    }
   } catch(e) {
     console.warn('Failed to read recipe-ingredients hash:', e);
   }
@@ -1424,12 +1433,4 @@ window.addEventListener('ExtensionAddRecipe', (e) => {
 if (location.protocol === 'file:') {
   const banner = document.createElement('div');
   banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#8a3a00;color:#fff;font-size:13px;padding:8px 20px;text-align:center;';
-  banner.innerHTML = '⚠️ Running as a local file — GitHub sync and ingredient auto-fetch require the page to be served over HTTP. <strong>Use the GitHub Pages version at zarnirob.github.io for full functionality.</strong> <button onclick="this.parentElement.remove()" style="margin-left:16px;background:#fff3;border:none;color:#fff;cursor:pointer;padding:2px 8px;border-radius:4px;">✕</button>';
-  document.body.prepend(banner);
-}
-
-populateDropdowns();
-render();
-</script>
-</body>
-</html>
+  banner.innerHTML = '⚠️ Running as a local file — GitHub sync and
