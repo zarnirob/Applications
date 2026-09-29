@@ -1410,19 +1410,28 @@ window.addEventListener('ExtensionAddRecipe', (e) => {
     // Clean the hash from the URL without reloading
     history.replaceState(null, '', location.pathname + location.search);
     // Auto-select the matching recipe by URL, then open grocery modal
-    var matchIdx = recipes.findIndex(function(r) { return r.url === data.url; });
+    // Normalize URLs for comparison: strip trailing slash and query params
+    function normalizeUrl(u) {
+      try {
+        var p = new URL(u);
+        return (p.origin + p.pathname).replace(/\/$/, '').toLowerCase();
+      } catch(e) { return u.toLowerCase().replace(/\/$/, ''); }
+    }
+    var normIncoming = normalizeUrl(data.url);
+    var matchIdx = recipes.findIndex(function(r) { return normalizeUrl(r.url) === normIncoming; });
     if (matchIdx !== -1) {
       selectedIndexes.add(matchIdx);
       render();
-      // Small delay so the table renders selected state before modal opens
       setTimeout(function() { groceryBtn.click(); }, 200);
     } else {
-      // Recipe not in dashboard yet — just show toast
+      // Show what URL we got vs what's in the list so we can diagnose
+      var recipeUrls = recipes.slice(0, 5).map(function(r) { return normalizeUrl(r.url); }).join('\n');
       var toast = document.createElement('div');
-      toast.style.cssText = 'position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:#2e2e29;border:1px solid #5a9e6a;border-radius:24px;padding:10px 22px;font-size:13px;color:#e8e4da;z-index:9999;box-shadow:0 4px 24px rgba(0,0,0,0.5);white-space:nowrap;';
-      toast.textContent = '\u2713 ' + data.ingredients.length + ' ingredients saved — select the recipe and open Grocery List';
+      toast.style.cssText = 'position:fixed;top:80px;left:20px;right:20px;background:#2e2e29;border:1px solid #e05555;border-radius:8px;padding:14px 18px;font-size:12px;color:#e8e4da;z-index:9999;box-shadow:0 4px 24px rgba(0,0,0,0.5);font-family:monospace;white-space:pre-wrap;';
+      toast.textContent = '\u26a0 Recipe not found in dashboard.\n\nBookmarklet URL:\n' + data.url + '\n\nFirst 5 dashboard URLs:\n' + recipeUrls + '\n\n(tap to dismiss)';
+      toast.addEventListener('click', function(){ toast.remove(); });
       document.body.appendChild(toast);
-      setTimeout(function(){ toast.remove(); }, 6000);
+      setTimeout(function(){ toast.remove(); }, 20000);
     }
   } catch(e) {
     console.warn('Failed to read recipe-ingredients hash:', e);
