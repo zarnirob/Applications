@@ -1422,8 +1422,32 @@ window.addEventListener('ExtensionAddRecipe', (e) => {
     var pendingUrl = normIncoming;
     var pendingCount = data.ingredients.length;
 
+    // Fuzzy title comparison — strip accents, lowercase, strip punctuation
+    function normalizeTitle(t) {
+      return (t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+    }
+    var normTitle = normalizeTitle(data.title);
+
     function tryAutoSelect() {
+      // First try: exact URL match (normalized)
       var matchIdx = recipes.findIndex(function(r) { return normalizeUrl(r.url) === pendingUrl; });
+      // Second try: title match (handles flip.it and other redirect aliases)
+      if (matchIdx === -1 && normTitle) {
+        matchIdx = recipes.findIndex(function(r) {
+          var rt = normalizeTitle(r.title);
+          // Accept if one title contains the other, or they share 80%+ of words
+          if (rt === normTitle) return true;
+          if (rt.includes(normTitle) || normTitle.includes(rt)) return true;
+          // Use the shorter title's meaningful words and check against the longer
+          var shorter = normTitle.length <= rt.length ? normTitle : rt;
+          var longer  = normTitle.length <= rt.length ? rt : normTitle;
+          var words = shorter.split(' ').filter(function(w){ return w.length > 3 && ['recipe','easy','best','with','from','your'].indexOf(w) === -1; });
+          if (words.length === 0) return false;
+          var matches = words.filter(function(w){ return longer.includes(w); }).length;
+          return matches / words.length >= 0.75;
+        });
+      }
       if (matchIdx !== -1) {
         selectedIndexes.add(matchIdx);
         render();
