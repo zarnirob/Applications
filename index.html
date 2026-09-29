@@ -832,31 +832,86 @@ function decodeUTF8Base64(b64) {
   }
 }
 
-function fetchGitHubData() {
+async function fetchGitHubData() {
+  // ── Strategy 1: raw GitHub Pages URL (no auth needed, works if repo is public) ──
+  // e.g. https://raw.githubusercontent.com/zarnirob/Applications/main/data/recipes.csv
+  const rawBranches = ['main', 'master'];
+  for (const branch of rawBranches) {
+    const rawUrl = `https://raw.githubusercontent.com/${repoOwner}/${repoName}/${branch}/${filePath}?cache=${Date.now()}`;
+    try {
+      console.log('Trying raw URL:', rawUrl);
+      const res = await fetch(rawUrl);
+      if (res.ok) {
+        const csvContent = await res.text();
+        if (csvContent && csvContent.length > 10) {
+          // Also fetch the SHA via API so we can write back later (best-effort, non-blocking)
+          fetchSHAInBackground();
+          parseCSV(csvContent);
+          saveData();
+          populateDropdowns();
+          render();
+          alert(`✓ Fetched ${recipes.length} recipes!`);
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn('Raw fetch failed for branch', branch, e);
+    }
+  }
+
+  // ── Strategy 2: GitHub Contents API (needs valid PAT with repo/contents scope) ──
   const pat = getPAT();
-  const url = `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${filePath}?cache=${Date.now()}`;
+  const apiUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${filePath}?cache=${Date.now()}`;
   const headers = { 'Accept': 'application/vnd.github+json' };
   if (pat) headers['Authorization'] = `Bearer ${pat}`;
 
-  fetch(url, { headers })
-    .then(res => {
-      if (!res.ok) throw new Error('HTTP status ' + res.status);
-      return res.json();
-    })
-    .then(data => {
+  console.log('Trying GitHub API:', apiUrl, '| PAT present:', !!pat);
+  try {
+    const res = await fetch(apiUrl, { headers });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      if (res.status === 401) {
+        alert(`❌ GitHub API returned 401 Unauthorized.\n\nYour PAT token is either expired or missing the "repo" (or "contents:read") scope.\n\nTo fix:\n1. Go to github.com → Settings → Developer Settings → Personal Access Tokens\n2. Generate a new token with "repo" scope\n3. Paste it in ⚙️ Settings here\n\nMessage from GitHub: ${body.message || '(none)'}`);
+      } else if (res.status === 404) {
+        alert(`❌ GitHub API returned 404.\n\nCheck that:\n• Owner: ${repoOwner}\n• Repo: ${repoName}\n• Path: ${filePath}\n…are all correct in ⚙️ Settings.`);
+      } else {
+        alert(`❌ GitHub API error ${res.status}: ${body.message || 'Unknown error'}`);
+      }
+      return;
+    }
+    const data = await res.json();
+    fileSHA = data.sha;
+    localStorage.setItem('github_file_sha', fileSHA);
+    const csvContent = decodeUTF8Base64(data.content);
+    parseCSV(csvContent);
+    saveData();
+    populateDropdowns();
+    render();
+    alert(`✓ Fetched ${recipes.length} recipes from GitHub!`);
+  } catch (err) {
+    console.error('GitHub API fetch failed:', err);
+    alert(`❌ Network error reaching GitHub API.\n\n${err.message}`);
+  }
+}
+
+// Fetch the file SHA in the background so syncing back works later
+async function fetchSHAInBackground() {
+  const pat = getPAT();
+  if (!pat) return;
+  try {
+    const res = await fetch(
+      `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${filePath}`,
+      { headers: { 'Accept': 'application/vnd.github+json', 'Authorization': `Bearer ${pat}` } }
+    );
+    if (res.ok) {
+      const data = await res.json();
       fileSHA = data.sha;
       localStorage.setItem('github_file_sha', fileSHA);
-      const csvContent = decodeUTF8Base64(data.content);
-      parseCSV(csvContent);
-      saveData();
-      populateDropdowns();
-      render();
-      alert(`✓ Fetched ${recipes.length} recipes from GitHub!`);
-    })
-    .catch(err => {
-      console.warn('GitHub API fetch failed:', err);
-      alert('Failed to fetch from GitHub API. Please check your settings or network connection.');
-    });
+      console.log('SHA fetched in background:', fileSHA);
+    }
+  } catch (e) {
+    console.warn('Background SHA fetch failed:', e);
+  }
 }
 
 fetchGithubBtn.addEventListener('click', fetchGitHubData);
@@ -1382,4 +1437,68 @@ function categorizeIngredient(line) {
   if (l.match(/milk|butter|cheese|cream|egg|yogurt|sour cream/))                          return 'REFRIGERATED & DAIRY';
   if (l.match(/chicken|beef|pork|steak|turkey|bacon|sausage|fish|salmon|shrimp/))         return 'MEAT & SEAFOOD';
   if (l.match(/onion|garlic|tomato|potato|lemon|lime|herb|basil|parsley|lettuce|spinach|carrot|celery/)) return 'PRODUCE';
-  if (l.match(/flour|sugar|salt|pepper|oil|vinegar|baking|vanilla|cinnamon|spice|sauce|rice|pasta/
+  if (l.match(/flour|sugar|salt|pepper|oil|vinegar|baking|vanilla|cinnamon|spice|sauce|rice|pasta/))     return 'PANTRY & BAKING';
+  return 'MISCELLANEOUS';
+}
+
+buildListBtn.addEventListener('click', () => {
+  const textareas = ingredientInputs.querySelectorAll('textarea');
+  const categories = {
+    'PRODUCE':             [],
+    'MEAT & SEAFOOD':      [],
+    'REFRIGERATED & DAIRY':[],
+    'PANTRY & BAKING':     [],
+    'MISCELLANEOUS':       []
+  };
+  const recipeNames = [];
+
+  textareas.forEach(ta => {
+    recipeNames.push(ta.dataset.title);
+    ta.value.split('\n').forEach(line => {
+      const clean = line.trim().replace(/^[-•\d+.]+\s*/, '');
+      if (clean) {
+        const cat = categorizeIngredient(clean);
+        if (!categories[cat].includes(clean)) categories[cat].push(clean);
+      }
+    });
+  });
+
+  const today = new Date().toISOString().split('T')[0];
+  let output = `🛒 GROCERY LIST (${today})\nRecipes: ${recipeNames.join(', ')}\n\n`;
+
+  for (const [cat, items] of Object.entries(categories)) {
+    if (items.length > 0) {
+      output += `${cat}\n`;
+      items.forEach(item => { output += `- [ ] ${item}\n`; });
+      output += '\n';
+    }
+  }
+
+  formattedListText = output.trim();
+  groceryPreview.textContent = formattedListText;
+  groceryResultSection.style.display = 'block';
+});
+
+copyGroceryBtn.addEventListener('click', () => {
+  navigator.clipboard.writeText(formattedListText)
+    .then(() => { alert('✓ Grocery list copied! Paste into Apple Notes or Google Keep.'); })
+    .catch(err => { console.error('Copy failed:', err); });
+});
+
+// ── Browser extension bridge (optional) ──────────────────────────────────────
+window.addEventListener('ExtensionAddRecipe', (e) => {
+  if (e.detail) {
+    recipes.unshift(e.detail);
+    saveData();
+    populateDropdowns();
+    render();
+    console.log('✓ Added recipe from extension:', e.detail.title);
+  }
+});
+
+// ── Boot ─────────────────────────────────────────────────────────────────────
+populateDropdowns();
+render();
+</script>
+</body>
+</html>
