@@ -5,593 +5,511 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Recipe Bookmarks</title>
 <style>
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  /* ── Reset & Base ───────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-:root {
-  --bg:          #1a1a18;
-  --surface:     #242420;
-  --surface2:    #2e2e29;
-  --border:      #3a3a34;
-  --accent:      #c8873a;
-  --accent-dim:  #8a5a22;
-  --accent-glow: rgba(200,135,58,0.18);
-  --text:        #e8e4da;
-  --text-muted:  #8a8678;
-  --text-dim:    #5a5850;
-  --green:       #5a9e6a;
-  --row-alt:     rgba(255,255,255,0.025);
-  --row-hover:   rgba(200,135,58,0.08);
-  --row-sel:     rgba(200,135,58,0.15);
-  --radius:      6px;
-  --ff-display:  'Georgia', 'Times New Roman', serif;
-  --ff-body:     'Segoe UI', system-ui, sans-serif;
-  --ff-mono:     'Consolas', monospace;
-}
+  :root {
+    --bg:          #1a1a18;
+    --surface:     #242420;
+    --surface2:    #2e2e29;
+    --border:      #3a3a34;
+    --accent:      #c8873a;
+    --accent-dim:  #8a5a22;
+    --accent-glow: rgba(200,135,58,0.18);
+    --text:        #e8e4da;
+    --text-muted:  #8a8678;
+    --text-dim:    #5a5850;
+    --green:       #5a9e6a;
+    --row-alt:     rgba(255,255,255,0.025);
+    --row-hover:   rgba(200,135,58,0.08);
+    --row-sel:     rgba(200,135,58,0.15);
+    --radius:      6px;
+    --ff-display:  'Georgia', 'Times New Roman', serif;
+    --ff-body:     'Segoe UI', system-ui, sans-serif;
+    --ff-mono:     'Consolas', monospace;
+  }
 
-body {
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--ff-body);
-  font-size: 14px;
-  line-height: 1.5;
-  min-height: 100vh;
-}
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--ff-body);
+    font-size: 14px;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
 
-header {
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  padding: 18px 28px 14px;
-  display: flex;
-  align-items: baseline;
-  gap: 14px;
-}
-header h1 {
-  font-family: var(--ff-display);
-  font-size: 22px;
-  font-weight: normal;
-  color: var(--accent);
-  letter-spacing: 0.03em;
-}
-header .subtitle {
-  color: var(--text-muted);
-  font-size: 12px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
+  /* ── Header ─────────────────────────────────────────────────── */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 18px 28px 14px;
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+  }
+  header h1 {
+    font-family: var(--ff-display);
+    font-size: 22px;
+    font-weight: normal;
+    color: var(--accent);
+    letter-spacing: 0.03em;
+  }
+  header .subtitle {
+    color: var(--text-muted);
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
 
-.shell {
-  display: grid;
-  grid-template-rows: auto auto 1fr;
-  height: calc(100vh - 57px);
-}
+  /* ── Layout ─────────────────────────────────────────────────── */
+  .shell {
+    display: grid;
+    grid-template-rows: auto 1fr;
+    height: calc(100vh - 57px);
+  }
 
-.filters {
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  padding: 14px 28px;
-  display: flex;
-  gap: 14px;
-  align-items: flex-end;
-  flex-wrap: wrap;
-}
-.filter-group {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-.filter-group label {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--text-muted);
-}
-.filter-group input,
-.filter-group select {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text);
-  font-family: var(--ff-body);
-  font-size: 13px;
-  padding: 7px 10px;
-  outline: none;
-  transition: border-color 0.15s;
-}
-.filter-group input { width: 260px; }
-.filter-group select { width: 200px; cursor: pointer; }
-.filter-group input:focus,
-.filter-group select:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--accent-glow);
-}
-.filter-group input::placeholder { color: var(--text-dim); }
+  /* ── Filter bar ─────────────────────────────────────────────── */
+  .filters {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 28px;
+    display: flex;
+    gap: 14px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+  }
+  .filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .filter-group label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+  }
+  .filter-group input,
+  .filter-group select {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: var(--ff-body);
+    font-size: 13px;
+    padding: 7px 10px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .filter-group input { width: 260px; }
+  .filter-group select { width: 200px; cursor: pointer; }
+  .filter-group input:focus,
+  .filter-group select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent-glow);
+  }
+  .filter-group input::placeholder { color: var(--text-dim); }
 
-.filter-actions {
-  display: flex;
-  gap: 8px;
-  padding-bottom: 1px;
-  margin-left: auto;
-  align-items: flex-end;
-}
-.btn {
-  border: none;
-  border-radius: var(--radius);
-  cursor: pointer;
-  font-family: var(--ff-body);
-  font-size: 13px;
-  font-weight: 600;
-  padding: 8px 18px;
-  transition: opacity 0.15s, background 0.15s;
-  white-space: nowrap;
-}
-.btn:active { opacity: 0.8; }
-.btn-primary {
-  background: var(--accent);
-  color: #1a1a18;
-}
-.btn-primary:disabled {
-  background: var(--accent-dim);
-  color: var(--text-dim);
-  cursor: not-allowed;
-}
-.btn-ghost {
-  background: var(--surface2);
-  color: var(--text-muted);
-  border: 1px solid var(--border);
-}
-.btn-ghost:hover { color: var(--text); border-color: var(--text-muted); }
+  .filter-actions {
+    display: flex;
+    gap: 8px;
+    padding-bottom: 1px;
+    margin-left: auto;
+    align-items: flex-end;
+  }
+  .btn {
+    border: none;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-family: var(--ff-body);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 8px 18px;
+    transition: opacity 0.15s, background 0.15s;
+    white-space: nowrap;
+  }
+  .btn:active { opacity: 0.8; }
+  .btn-primary {
+    background: var(--accent);
+    color: #1a1a18;
+  }
+  .btn-primary:disabled {
+    background: var(--accent-dim);
+    color: var(--text-dim);
+    cursor: not-allowed;
+  }
+  .btn-ghost {
+    background: var(--surface2);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+  }
+  .btn-ghost:hover { color: var(--text); border-color: var(--text-muted); }
 
-.results-wrap {
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  padding: 0 28px 20px;
-  min-height: 0;
-}
+  /* ── Results area ────────────────────────────────────────────── */
+  .results-wrap {
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    padding: 0 28px 20px;
+  }
 
-.statusbar {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 10px 0 8px;
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-}
-.statusbar .count {
-  font-size: 12px;
-  color: var(--text-muted);
-}
-.statusbar .count strong { color: var(--accent); }
-.statusbar .sel-count {
-  font-size: 12px;
-  color: var(--green);
-}
-.statusbar .spacer { flex: 1; }
-.select-all-btn {
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  font-size: 12px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  transition: color 0.1s;
-}
-.select-all-btn:hover { color: var(--accent); }
+  /* ── Status bar ─────────────────────────────────────────────── */
+  .statusbar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 10px 0 8px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .statusbar .count {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .statusbar .count strong { color: var(--accent); }
+  .statusbar .sel-count {
+    font-size: 12px;
+    color: var(--green);
+  }
+  .statusbar .spacer { flex: 1; }
+  .select-all-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 12px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: color 0.1s;
+  }
+  .select-all-btn:hover { color: var(--accent); }
 
-.table-scroll {
-  overflow-y: auto;
-  flex: 1;
-  min-height: 0;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  margin-top: 2px;
-}
-.table-scroll::-webkit-scrollbar { width: 6px; }
-.table-scroll::-webkit-scrollbar-track { background: var(--surface); }
-.table-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  /* ── Table ───────────────────────────────────────────────────── */
+  .table-scroll {
+    overflow-y: auto;
+    flex: 1;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-top: 2px;
+  }
+  .table-scroll::-webkit-scrollbar { width: 6px; }
+  .table-scroll::-webkit-scrollbar-track { background: var(--surface); }
+  .table-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-thead {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  background: var(--surface2);
-}
-thead th {
-  padding: 10px 14px;
-  text-align: left;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  border-bottom: 1px solid var(--border);
-  white-space: nowrap;
-}
-thead th:first-child { width: 36px; }
-thead th:nth-child(2) { width: 40%; }
-thead th:nth-child(3) { width: 20%; }
-thead th:nth-child(4) { width: 13%; }
-thead th:nth-child(5) { width: 36px; text-align: center; }
-thead th:last-child   { width: 44px; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  thead {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--surface2);
+  }
+  thead th {
+    padding: 10px 14px;
+    text-align: left;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  thead th:first-child { width: 36px; }
+  thead th:nth-child(2) { width: 40%; }
+  thead th:nth-child(3) { width: 20%; }
+  thead th:nth-child(4) { width: 13%; }
+  thead th:nth-child(5) { width: 36px; text-align: center; }
+  thead th:last-child   { width: 44px; }
 
-tbody tr {
-  border-bottom: 1px solid rgba(255,255,255,0.04);
-  cursor: pointer;
-  transition: background 0.08s;
-}
-tbody tr:nth-child(even) { background: var(--row-alt); }
-tbody tr:hover { background: var(--row-hover); }
-tbody tr.selected { background: var(--row-sel) !important; }
+  tbody tr {
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    cursor: pointer;
+    transition: background 0.08s;
+  }
+  tbody tr:nth-child(even) { background: var(--row-alt); }
+  tbody tr:hover { background: var(--row-hover); }
+  tbody tr.selected { background: var(--row-sel) !important; }
 
-td {
-  padding: 9px 14px;
-  vertical-align: middle;
-}
-td:first-child { text-align: center; }
+  td {
+    padding: 9px 14px;
+    vertical-align: middle;
+  }
+  td:first-child { text-align: center; }
 
-input[type=checkbox] {
-  appearance: none;
-  width: 15px; height: 15px;
-  border: 1.5px solid var(--border);
-  border-radius: 3px;
-  background: var(--bg);
-  cursor: pointer;
-  position: relative;
-  transition: border-color 0.1s, background 0.1s;
-  flex-shrink: 0;
-  vertical-align: middle;
-}
-input[type=checkbox]:checked {
-  background: var(--accent);
-  border-color: var(--accent);
-}
-input[type=checkbox]:checked::after {
-  content: '';
-  position: absolute;
-  left: 3px; top: 0px;
-  width: 5px; height: 9px;
-  border: 2px solid #1a1a18;
-  border-top: none;
-  border-left: none;
-  transform: rotate(45deg);
-}
+  /* Checkbox */
+  input[type=checkbox] {
+    appearance: none;
+    width: 15px; height: 15px;
+    border: 1.5px solid var(--border);
+    border-radius: 3px;
+    background: var(--bg);
+    cursor: pointer;
+    position: relative;
+    transition: border-color 0.1s, background 0.1s;
+    flex-shrink: 0;
+    vertical-align: middle;
+  }
+  input[type=checkbox]:checked {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+  input[type=checkbox]:checked::after {
+    content: '';
+    position: absolute;
+    left: 3px; top: 0px;
+    width: 5px; height: 9px;
+    border: 2px solid #1a1a18;
+    border-top: none;
+    border-left: none;
+    transform: rotate(45deg);
+  }
 
-.title-cell {
-  color: var(--text);
-  font-size: 13px;
-  line-height: 1.35;
-}
-.cat-badge {
-  display: inline-block;
-  background: rgba(200,135,58,0.12);
-  border: 1px solid rgba(200,135,58,0.25);
-  color: var(--accent);
-  font-size: 11px;
-  padding: 2px 7px;
-  border-radius: 20px;
-}
-.prot-badge {
-  display: inline-block;
-  background: rgba(90,158,106,0.12);
-  border: 1px solid rgba(90,158,106,0.25);
-  color: var(--green);
-  font-size: 11px;
-  padding: 2px 7px;
-  border-radius: 20px;
-}
+  .title-cell {
+    color: var(--text);
+    font-size: 13px;
+    line-height: 1.35;
+  }
+  .cat-badge {
+    display: inline-block;
+    background: rgba(200,135,58,0.12);
+    border: 1px solid rgba(200,135,58,0.25);
+    color: var(--accent);
+    font-size: 11px;
+    padding: 2px 7px;
+    border-radius: 20px;
+  }
+  .prot-badge {
+    display: inline-block;
+    background: rgba(90,158,106,0.12);
+    border: 1px solid rgba(90,158,106,0.25);
+    color: var(--green);
+    font-size: 11px;
+    padding: 2px 7px;
+    border-radius: 20px;
+  }
 
-.empty {
-  text-align: center;
-  padding: 60px 20px;
-  color: var(--text-dim);
-}
-.empty .icon { font-size: 36px; margin-bottom: 10px; }
-.empty p { font-size: 14px; }
+  /* ── Empty state ─────────────────────────────────────────────── */
+  .empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-dim);
+  }
+  .empty .icon { font-size: 36px; margin-bottom: 10px; }
+  .empty p { font-size: 14px; }
 
-.open-bar {
-  flex-shrink: 0;
-  padding-bottom: 4px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding-top: 12px;
-  flex-wrap: wrap;
-}
-.open-bar .hint {
-  font-size: 12px;
-  color: var(--text-dim);
-}
+  /* ── Open button bar ─────────────────────────────────────────── */
+  .open-bar {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-top: 12px;
+  }
+  .open-bar .hint {
+    font-size: 12px;
+    color: var(--text-dim);
+  }
 
-#linkPanel {
-  margin-top: 10px;
-  background: var(--surface);
-  border: 1px solid var(--accent-dim);
-  border-radius: var(--radius);
-  overflow: hidden;
-  flex-shrink: 0;
-  max-height: 220px;
-  display: flex;
-  flex-direction: column;
-}
-.link-panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 14px;
-  background: var(--surface2);
-  border-bottom: 1px solid var(--border);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--accent);
-  flex-shrink: 0;
-}
-#linkList {
-  overflow-y: auto;
-  padding: 6px 0;
-}
-#linkList::-webkit-scrollbar { width: 5px; }
-#linkList::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-.link-item {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  padding: 5px 14px;
-}
-.link-item:hover { background: var(--row-hover); }
-.link-num {
-  font-size: 10px;
-  color: var(--text-dim);
-  min-width: 20px;
-  text-align: right;
-  flex-shrink: 0;
-}
-.link-item a {
-  color: var(--accent);
-  text-decoration: none;
-  font-size: 13px;
-  line-height: 1.3;
-}
-.link-item a:hover { text-decoration: underline; }
-.link-item a:visited { color: var(--text-muted); }
+  /* ── Link panel ──────────────────────────────────────────────── */
+  #linkPanel {
+    margin-top: 10px;
+    background: var(--surface);
+    border: 1px solid var(--accent-dim);
+    border-radius: var(--radius);
+    overflow: hidden;
+    flex-shrink: 0;
+    max-height: 220px;
+    display: flex;
+    flex-direction: column;
+  }
+  .link-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    flex-shrink: 0;
+  }
+  #linkList {
+    overflow-y: auto;
+    padding: 6px 0;
+  }
+  #linkList::-webkit-scrollbar { width: 5px; }
+  #linkList::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  .link-item {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 5px 14px;
+  }
+  .link-item:hover { background: var(--row-hover); }
+  .link-num {
+    font-size: 10px;
+    color: var(--text-dim);
+    min-width: 20px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+  .link-item a {
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 13px;
+    line-height: 1.3;
+  }
+  .link-item a:hover { text-decoration: underline; }
+  .link-item a:visited { color: var(--text-muted); }
 
-.btn-fav {
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  color: var(--text-muted);
-  transition: all 0.15s;
-}
-.btn-fav:hover { color: var(--accent); border-color: var(--accent-dim); }
-.btn-fav.active {
-  background: rgba(200,135,58,0.15);
-  border-color: var(--accent);
-  color: var(--accent);
-}
+  /* ── Favorites toggle button ─────────────────────────────────── */
+  .btn-fav {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    transition: all 0.15s;
+  }
+  .btn-fav:hover { color: var(--accent); border-color: var(--accent-dim); }
+  .btn-fav.active {
+    background: rgba(200,135,58,0.15);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
 
-#addPanel {
-  margin-top: 8px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  overflow: hidden;
-  flex-shrink: 0;
-}
-.add-form {
-  padding: 12px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.add-row {
-  display: flex;
-  gap: 12px;
-  align-items: flex-end;
-  flex-wrap: wrap;
-}
-.add-field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.add-field label {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-muted);
-}
-.add-field input, .add-field select {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text);
-  font-family: var(--ff-body);
-  font-size: 13px;
-  padding: 6px 10px;
-  outline: none;
-  min-width: 180px;
-  transition: border-color 0.15s;
-}
-.add-field input:focus, .add-field select:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--accent-glow);
-}
-.add-field.wide input { min-width: 280px; }
-.add-field.add-submit { flex-direction: row; align-items: center; gap: 10px; }
-.req { color: var(--accent); }
-#addMsg { font-size: 12px; color: var(--green); }
-#addMsg.error { color: #e05555; }
+  /* ── Add Recipe panel ────────────────────────────────────────── */
+  #addPanel {
+    margin-top: 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .add-form {
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .add-row {
+    display: flex;
+    gap: 12px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+  }
+  .add-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .add-field label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+  }
+  .add-field input, .add-field select {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: var(--ff-body);
+    font-size: 13px;
+    padding: 6px 10px;
+    outline: none;
+    min-width: 180px;
+    transition: border-color 0.15s;
+  }
+  .add-field input:focus, .add-field select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent-glow);
+  }
+  .add-field.wide input { min-width: 280px; }
+  .add-field.add-submit { flex-direction: row; align-items: center; gap: 10px; }
+  .req { color: var(--accent); }
+  #addMsg { font-size: 12px; color: var(--green); }
+  #addMsg.error { color: #e05555; }
 
-.star-btn {
-  background: none;
-  border: none;
-  color: var(--text-dim);
-  cursor: pointer;
-  font-size: 16px;
-  padding: 2px 5px;
-  border-radius: 4px;
-  line-height: 1;
-  transition: color 0.12s, transform 0.1s;
-}
-.star-btn:hover { color: var(--accent); transform: scale(1.2); }
-.star-btn.starred { color: #f0b429; }
+  /* ── Star button ─────────────────────────────────────────────── */
+  .star-btn {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 16px;
+    padding: 2px 5px;
+    border-radius: 4px;
+    line-height: 1;
+    transition: color 0.12s, transform 0.1s;
+  }
+  .star-btn:hover { color: var(--accent); transform: scale(1.2); }
+  .star-btn.starred { color: #f0b429; }
 
-.fav-count {
-  font-size: 12px;
-  color: #f0b429;
-}
-.del-btn {
-  background: none;
-  border: none;
-  color: var(--text-dim);
-  cursor: pointer;
-  font-size: 15px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  line-height: 1;
-  transition: color 0.12s, background 0.12s;
-}
-.del-btn:hover { color: #e05555; background: rgba(224,85,85,0.12); }
+  /* ── Fav count badge in statusbar ────────────────────────────── */
+  .fav-count {
+    font-size: 12px;
+    color: #f0b429;
+  }
+  .del-btn {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 15px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    line-height: 1;
+    transition: color 0.12s, background 0.12s;
+  }
+  .del-btn:hover { color: #e05555; background: rgba(224,85,85,0.12); }
 
-#undoToast {
-  position: fixed;
-  bottom: 28px;
-  left: 50%;
-  transform: translateX(-50%) translateY(80px);
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: 24px;
-  padding: 10px 20px;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  font-size: 13px;
-  color: var(--text);
-  box-shadow: 0 4px 24px rgba(0,0,0,0.5);
-  transition: transform 0.25s cubic-bezier(.34,1.56,.64,1), opacity 0.25s;
-  opacity: 0;
-  z-index: 999;
-  white-space: nowrap;
-}
-#undoToast.show {
-  transform: translateX(-50%) translateY(0);
-  opacity: 1;
-}
-#undoToast button {
-  background: var(--accent);
-  border: none;
-  border-radius: 12px;
-  color: #1a1a18;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 700;
-  padding: 4px 12px;
-}
-#undoToast button:hover { opacity: 0.85; }
-
-.modal-overlay {
-  display: none;
-  position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0,0,0,0.7);
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
-}
-.modal-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  padding: 25px;
-  border-radius: 10px;
-  max-width: 620px;
-  width: 90%;
-  max-height: 85vh;
-  overflow-y: auto;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-}
-.fetch-btn {
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text-muted);
-  cursor: pointer;
-  font-size: 11px;
-  font-family: var(--ff-body);
-  padding: 3px 10px;
-  transition: color 0.15s, border-color 0.15s;
-  white-space: nowrap;
-}
-.fetch-btn:hover { color: var(--accent); border-color: var(--accent-dim); }
-.fetch-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.fetch-status {
-  font-size: 11px;
-  color: var(--text-muted);
-  font-style: italic;
-  margin-left: 6px;
-}
-.fetch-status.ok  { color: var(--green); font-style: normal; }
-.fetch-status.err { color: #e05555;      font-style: normal; }
-.ing-label-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 5px;
-  flex-wrap: wrap;
-}
-.ing-label-row label {
-  font-weight: bold;
-  color: var(--accent);
-}
-
-.grocery-preview {
-  background: var(--bg);
-  padding: 15px;
-  border-radius: 6px;
-  font-family: var(--ff-mono);
-  white-space: pre-wrap;
-  max-height: 250px;
-  overflow-y: auto;
-  border: 1px solid var(--border);
-  color: var(--text);
-}
-.modal-card textarea {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text);
-  font-family: var(--ff-body);
-  font-size: 13px;
-  padding: 8px;
-  outline: none;
-}
-
-.config-panel {
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  padding: 12px 28px;
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-.config-panel input {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text);
-  padding: 6px 10px;
-  font-size: 12px;
-}
+  /* ── Undo toast ──────────────────────────────────────────────── */
+  #undoToast {
+    position: fixed;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    font-size: 13px;
+    color: var(--text);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+    transition: transform 0.25s cubic-bezier(.34,1.56,.64,1), opacity 0.25s;
+    opacity: 0;
+    z-index: 999;
+    white-space: nowrap;
+  }
+  #undoToast.show {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+  #undoToast button {
+    background: var(--accent);
+    border: none;
+    border-radius: 12px;
+    color: #1a1a18;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 4px 12px;
+  }
+  #undoToast button:hover { opacity: 0.85; }
 </style>
 </head>
 <body>
 
 <header>
-  <h1>🍳 Recipe Bookmarks</h1>
+  <h1>&#127859; Recipe Bookmarks</h1>
   <span class="subtitle" id="headerSubtitle">keyword search &amp; filter</span>
 </header>
 
@@ -615,24 +533,8 @@ input[type=checkbox]:checked::after {
     </div>
     <div class="filter-actions">
       <button class="btn btn-fav" id="favFilterBtn" title="Show favorites only">☆ Favorites</button>
-      <button class="btn btn-ghost" id="fetchGithubBtn">⬇ Fetch from GitHub</button>
-      <button class="btn btn-ghost" id="toggleConfigBtn">⚙️ Settings</button>
       <button class="btn btn-ghost" id="clearBtn">Clear</button>
     </div>
-  </div>
-
-  <div id="configPanel" class="config-panel" style="display:none;">
-    <label><strong>Token:</strong></label>
-    <input type="password" id="patInput" placeholder="github_pat_..." style="width: 220px;">
-    <label><strong>Owner:</strong></label>
-    <input type="text" id="ownerInput" placeholder="username" style="width: 100px;">
-    <label><strong>Repo:</strong></label>
-    <input type="text" id="repoInput" placeholder="MyRepo" style="width: 120px;">
-    <label><strong>Path:</strong></label>
-    <input type="text" id="pathInput" placeholder="data/recipes.csv" style="width: 140px;">
-    <label><strong>Worker URL:</strong></label>
-    <input type="text" id="workerUrlInput" placeholder="https://your-worker.workers.dev" style="width: 260px;">
-    <button class="btn btn-primary" id="savePatBtn">Save Settings</button>
   </div>
 
   <div class="results-wrap">
@@ -662,12 +564,14 @@ input[type=checkbox]:checked::after {
 
     <div class="open-bar">
       <button class="btn btn-primary" id="openBtn" disabled>Open selected in tabs</button>
-      <button class="btn btn-ghost" style="border-color: var(--green); color: var(--green);" id="groceryBtn">🛒 Grocery List</button>
       <button class="btn btn-ghost" id="addRecipeToggle">＋ Add Recipe</button>
-      <button class="btn btn-ghost" style="border-color: var(--accent); color: var(--accent);" id="syncGithubBtn">💾 Save &amp; Sync All Changes to GitHub</button>
+      <button class="btn btn-ghost" id="importBtn">⬆ Import CSV/Excel</button>
+      <input type="file" id="importFileInput" accept=".csv" style="display:none">
+      <button class="btn btn-ghost" id="exportBtn">⬇ Export Excel</button>
       <span class="hint" id="openHint">Select one or more recipes, then click to open their links.</span>
     </div>
 
+    <!-- Add Recipe panel -->
     <div id="addPanel" style="display:none">
       <div class="link-panel-header">
         <span>Add a New Recipe</span>
@@ -701,6 +605,7 @@ input[type=checkbox]:checked::after {
       </div>
     </div>
 
+    <!-- Link panel: shown after clicking "Open selected in tabs" -->
     <div id="linkPanel" style="display:none">
       <div class="link-panel-header">
         <span id="linkPanelLabel"></span>
@@ -711,342 +616,94 @@ input[type=checkbox]:checked::after {
   </div>
 </div>
 
-<div id="groceryModal" class="modal-overlay">
-  <div class="modal-card">
-    <h2 style="margin-top:0; color:var(--accent);">🛒 Generate Grocery List</h2>
-    <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 15px;">Click <strong style="color:var(--accent)">Auto-fetch</strong> to scrape ingredients, or paste them manually.</p>
-    <div id="ingredientInputs"></div>
-    <div style="display: flex; gap: 10px; margin-top: 15px;">
-      <button class="btn btn-primary" id="buildListBtn">Build Formatted List</button>
-      <button class="btn btn-ghost" id="closeGroceryModalBtn">Cancel</button>
-    </div>
-    <div id="groceryResultSection" style="display:none; margin-top:20px;">
-      <h3 style="color: var(--accent); margin-bottom: 10px;">Preview &amp; Copy</h3>
-      <div id="groceryPreview" class="grocery-preview"></div>
-      <button class="btn btn-primary" style="width:100%; margin-top:10px; background: var(--green);" id="copyGroceryBtn">📋 Copy for Shared Notes</button>
-    </div>
-  </div>
-</div>
-
 <div id="undoToast">
   <span id="undoMsg"></span>
   <button id="undoBtn">Undo</button>
 </div>
 
 <script>
-// ── State ────────────────────────────────────────────────────────────────────
-let recipes = JSON.parse(localStorage.getItem('my_recipes') || '[]');
-let favorites = new Set(JSON.parse(localStorage.getItem('my_fav_recipes') || '[]'));
+// Initial Data
+const INITIAL_RECIPES = [];
+
+// App State
+let recipes = JSON.parse(localStorage.getItem('my_recipes')) || [];
+let favorites = new Set(JSON.parse(localStorage.getItem('my_fav_recipes') || "[]"));
 let selectedIndexes = new Set();
 let showFavsOnly = false;
 let lastDeletedRecipe = null;
 let lastDeletedIndex = null;
 let toastTimer = null;
-let formattedListText = '';
-let fileSHA = localStorage.getItem('github_file_sha') || '';
 
-const WORKER_URL_KEY = 'worker_url';
-let workerUrl = localStorage.getItem(WORKER_URL_KEY) || '';
+// DOM Elements
+const qInput = document.getElementById('q');
+const catSelect = document.getElementById('catFilter');
+const protSelect = document.getElementById('protFilter');
+const favFilterBtn = document.getElementById('favFilterBtn');
+const clearBtn = document.getElementById('clearBtn');
+const tbody = document.getElementById('tbody');
+const countLabel = document.getElementById('countLabel');
+const selLabel = document.getElementById('selLabel');
+const favLabel = document.getElementById('favLabel');
+const selectAllBtn = document.getElementById('selectAllBtn');
+const openBtn = document.getElementById('openBtn');
+const addRecipeToggle = document.getElementById('addRecipeToggle');
+const addPanel = document.getElementById('addPanel');
+const closeAddPanel = document.getElementById('closeAddPanel');
+const addCatSelect = document.getElementById('addCat');
+const addProtSelect = document.getElementById('addProt');
+const addSubmit = document.getElementById('addSubmit');
+const addMsg = document.getElementById('addMsg');
+const importBtn = document.getElementById('importBtn');
+const importFileInput = document.getElementById('importFileInput');
+const exportBtn = document.getElementById('exportBtn');
+const linkPanel = document.getElementById('linkPanel');
+const closeLinkPanel = document.getElementById('closeLinkPanel');
+const linkList = document.getElementById('linkList');
+const linkPanelLabel = document.getElementById('linkPanelLabel');
+const undoToast = document.getElementById('undoToast');
+const undoMsg = document.getElementById('undoMsg');
+const undoBtn = document.getElementById('undoBtn');
+const headerSubtitle = document.getElementById('headerSubtitle');
 
-const DEFAULT_PAT   = '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';
-const DEFAULT_OWNER = 'zarnirob';
-const DEFAULT_REPO  = 'Applications';
-const DEFAULT_PATH  = 'data/recipes.csv';
-
-let repoOwner = localStorage.getItem('github_owner') || DEFAULT_OWNER;
-let repoName  = localStorage.getItem('github_repo')  || DEFAULT_REPO;
-let filePath  = localStorage.getItem('github_path')  || DEFAULT_PATH;
-
-// ── DOM refs ─────────────────────────────────────────────────────────────────
-const qInput           = document.getElementById('q');
-const catSelect        = document.getElementById('catFilter');
-const protSelect       = document.getElementById('protFilter');
-const favFilterBtn     = document.getElementById('favFilterBtn');
-const clearBtn         = document.getElementById('clearBtn');
-const tbody            = document.getElementById('tbody');
-const countLabel       = document.getElementById('countLabel');
-const selLabel         = document.getElementById('selLabel');
-const favLabel         = document.getElementById('favLabel');
-const selectAllBtn     = document.getElementById('selectAllBtn');
-const openBtn          = document.getElementById('openBtn');
-const addRecipeToggle  = document.getElementById('addRecipeToggle');
-const addPanel         = document.getElementById('addPanel');
-const closeAddPanel    = document.getElementById('closeAddPanel');
-const addCatSelect     = document.getElementById('addCat');
-const addProtSelect    = document.getElementById('addProt');
-const addSubmit        = document.getElementById('addSubmit');
-const addMsg           = document.getElementById('addMsg');
-const linkPanel        = document.getElementById('linkPanel');
-const closeLinkPanel   = document.getElementById('closeLinkPanel');
-const linkList         = document.getElementById('linkList');
-const linkPanelLabel   = document.getElementById('linkPanelLabel');
-const undoToast        = document.getElementById('undoToast');
-const undoMsg          = document.getElementById('undoMsg');
-const undoBtn          = document.getElementById('undoBtn');
-const headerSubtitle   = document.getElementById('headerSubtitle');
-const groceryBtn       = document.getElementById('groceryBtn');
-const groceryModal     = document.getElementById('groceryModal');
-const ingredientInputs = document.getElementById('ingredientInputs');
-const buildListBtn     = document.getElementById('buildListBtn');
-const closeGroceryModalBtn  = document.getElementById('closeGroceryModalBtn');
-const groceryResultSection  = document.getElementById('groceryResultSection');
-const groceryPreview        = document.getElementById('groceryPreview');
-const copyGroceryBtn        = document.getElementById('copyGroceryBtn');
-const toggleConfigBtn       = document.getElementById('toggleConfigBtn');
-const configPanel           = document.getElementById('configPanel');
-const patInput              = document.getElementById('patInput');
-const ownerInput            = document.getElementById('ownerInput');
-const repoInput             = document.getElementById('repoInput');
-const pathInput             = document.getElementById('pathInput');
-const savePatBtn            = document.getElementById('savePatBtn');
-const fetchGithubBtn        = document.getElementById('fetchGithubBtn');
-const syncGithubBtn         = document.getElementById('syncGithubBtn');
-
-// ── Init settings fields ─────────────────────────────────────────────────────
-document.getElementById('workerUrlInput').value = workerUrl;
-patInput.value   = localStorage.getItem('github_pat')   || DEFAULT_PAT;
-ownerInput.value = repoOwner;
-repoInput.value  = repoName;
-pathInput.value  = filePath;
-
-// ── Settings panel ───────────────────────────────────────────────────────────
-toggleConfigBtn.addEventListener('click', () => {
-  configPanel.style.display = configPanel.style.display === 'none' ? 'flex' : 'none';
-});
-
-savePatBtn.addEventListener('click', () => {
-  localStorage.setItem('github_pat',   patInput.value.trim());
-  localStorage.setItem('github_owner', ownerInput.value.trim());
-  localStorage.setItem('github_repo',  repoInput.value.trim());
-  localStorage.setItem('github_path',  pathInput.value.trim() || 'data/recipes.csv');
-  workerUrl = document.getElementById('workerUrlInput').value.trim();
-  localStorage.setItem(WORKER_URL_KEY, workerUrl);
-  repoOwner = localStorage.getItem('github_owner');
-  repoName  = localStorage.getItem('github_repo');
-  filePath  = localStorage.getItem('github_path');
-  alert('Settings saved successfully!');
-});
-
-function getPAT() {
-  return localStorage.getItem('github_pat') || patInput.value.trim() || DEFAULT_PAT;
-}
-
-// ── GitHub helpers ───────────────────────────────────────────────────────────
-function decodeUTF8Base64(b64) {
-  try {
-    return decodeURIComponent(escape(atob(b64.replace(/\s/g, ''))));
-  } catch (e) {
-    return atob(b64.replace(/\s/g, ''));
-  }
-}
-
-async function fetchGitHubData() {
-  // ── Strategy 1: raw GitHub Pages URL (no auth needed, works if repo is public) ──
-  // e.g. https://raw.githubusercontent.com/zarnirob/Applications/main/data/recipes.csv
-  const rawBranches = ['main', 'master'];
-  for (const branch of rawBranches) {
-    const rawUrl = `https://raw.githubusercontent.com/${repoOwner}/${repoName}/${branch}/${filePath}?cache=${Date.now()}`;
-    try {
-      console.log('Trying raw URL:', rawUrl);
-      const res = await fetch(rawUrl);
-      if (res.ok) {
-        const csvContent = await res.text();
-        if (csvContent && csvContent.length > 10) {
-          // Also fetch the SHA via API so we can write back later (best-effort, non-blocking)
-          fetchSHAInBackground();
-          parseCSV(csvContent);
-          saveData();
-          populateDropdowns();
-          render();
-          alert(`✓ Fetched ${recipes.length} recipes!`);
-          return;
-        }
-      }
-    } catch (e) {
-      console.warn('Raw fetch failed for branch', branch, e);
-    }
-  }
-
-  // ── Strategy 2: GitHub Contents API (needs valid PAT with repo/contents scope) ──
-  const pat = getPAT();
-  const apiUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${filePath}?cache=${Date.now()}`;
-  const headers = { 'Accept': 'application/vnd.github+json' };
-  if (pat) headers['Authorization'] = `Bearer ${pat}`;
-
-  console.log('Trying GitHub API:', apiUrl, '| PAT present:', !!pat);
-  try {
-    const res = await fetch(apiUrl, { headers });
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      if (res.status === 401) {
-        alert(`❌ GitHub API returned 401 Unauthorized.\n\nYour PAT token is either expired or missing the "repo" (or "contents:read") scope.\n\nTo fix:\n1. Go to github.com → Settings → Developer Settings → Personal Access Tokens\n2. Generate a new token with "repo" scope\n3. Paste it in ⚙️ Settings here\n\nMessage from GitHub: ${body.message || '(none)'}`);
-      } else if (res.status === 404) {
-        alert(`❌ GitHub API returned 404.\n\nCheck that:\n• Owner: ${repoOwner}\n• Repo: ${repoName}\n• Path: ${filePath}\n…are all correct in ⚙️ Settings.`);
-      } else {
-        alert(`❌ GitHub API error ${res.status}: ${body.message || 'Unknown error'}`);
-      }
-      return;
-    }
-    const data = await res.json();
-    fileSHA = data.sha;
-    localStorage.setItem('github_file_sha', fileSHA);
-    const csvContent = decodeUTF8Base64(data.content);
-    parseCSV(csvContent);
-    saveData();
-    populateDropdowns();
-    render();
-    alert(`✓ Fetched ${recipes.length} recipes from GitHub!`);
-  } catch (err) {
-    console.error('GitHub API fetch failed:', err);
-    alert(`❌ Network error reaching GitHub API.\n\n${err.message}`);
-  }
-}
-
-// Fetch the file SHA in the background so syncing back works later
-async function fetchSHAInBackground() {
-  const pat = getPAT();
-  if (!pat) return;
-  try {
-    const res = await fetch(
-      `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${filePath}`,
-      { headers: { 'Accept': 'application/vnd.github+json', 'Authorization': `Bearer ${pat}` } }
-    );
-    if (res.ok) {
-      const data = await res.json();
-      fileSHA = data.sha;
-      localStorage.setItem('github_file_sha', fileSHA);
-      console.log('SHA fetched in background:', fileSHA);
-    }
-  } catch (e) {
-    console.warn('Background SHA fetch failed:', e);
-  }
-}
-
-fetchGithubBtn.addEventListener('click', fetchGitHubData);
-
-function parseCSV(text) {
-  if (!text) return;
-  const lines = text.trim().split('\n');
-  recipes = [];
-
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
-
-    const row = [];
-    let insideQuote = false;
-    let entry = '';
-
-    for (let c = 0; c < line.length; c++) {
-      const char = line[c];
-      if (char === '"') {
-        insideQuote = !insideQuote;
-      } else if (char === ',' && !insideQuote) {
-        row.push(entry.trim());
-        entry = '';
-      } else {
-        entry += char;
-      }
-    }
-    row.push(entry.trim());
-
-    if (row.length >= 2) {
-      const cleanRow = row.map(cell => cell.replace(/^"|"$/g, '').trim());
-      recipes.push({
-        title:    cleanRow[0],
-        url:      cleanRow[1],
-        category: cleanRow[2] || 'Uncategorized',
-        protein:  cleanRow[3] || 'N/A'
-      });
-    }
-  }
-}
-
-function saveToGitHub(commitMessage) {
-  const pat = getPAT();
-  if (!pat) {
-    alert('Please configure your GitHub PAT Token in Settings first to sync changes.');
-    return;
-  }
-
-  let csvContent = 'Title,URL,Category,Protein\n';
-  recipes.forEach(r => {
-    const t = (r.title    || '').replace(/"/g, '""');
-    const u = (r.url      || '').replace(/"/g, '""');
-    const c = (r.category || 'Uncategorized').replace(/"/g, '""');
-    const p = (r.protein  || 'N/A').replace(/"/g, '""');
-    csvContent += `"${t}","${u}","${c}","${p}"\n`;
-  });
-
-  const encodedContent = btoa(unescape(encodeURIComponent(csvContent)));
-  const payload = { message: commitMessage, content: encodedContent, sha: fileSHA };
-
-  fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/contents/${filePath}`, {
-    method: 'PUT',
-    headers: {
-      'Authorization': `Bearer ${pat}`,
-      'Content-Type': 'application/json',
-      'Accept': 'application/vnd.github+json'
-    },
-    body: JSON.stringify(payload)
-  })
-    .then(res => {
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      return res.json();
-    })
-    .then(data => {
-      fileSHA = data.content.sha;
-      localStorage.setItem('github_file_sha', fileSHA);
-      alert('✓ Saved & synced to GitHub successfully!');
-    })
-    .catch(err => {
-      console.error('Error committing to GitHub:', err);
-      alert('Failed to sync with GitHub. Please check your PAT settings.');
-    });
-}
-
-syncGithubBtn.addEventListener('click', () => saveToGitHub('Manual dashboard sync'));
-
-// ── Dropdowns ────────────────────────────────────────────────────────────────
+// Setup Dropdown Options
 function populateDropdowns() {
-  const cats  = [...new Set(recipes.map(r => r.category).filter(Boolean))].sort();
+  const cats = [...new Set(recipes.map(r => r.category).filter(Boolean))].sort();
   const prots = [...new Set(recipes.map(r => r.protein).filter(Boolean))].sort();
 
-  catSelect.innerHTML  = '<option value="">All Categories</option>';
+  catSelect.innerHTML = '<option value="">All Categories</option>';
   cats.forEach(c => catSelect.add(new Option(c, c)));
 
   protSelect.innerHTML = '<option value="">All Proteins</option>';
   prots.forEach(p => protSelect.add(new Option(p, p)));
 
-  addCatSelect.innerHTML  = '<option value="">— Select —</option>';
+  addCatSelect.innerHTML = '<option value="">— Select —</option>';
   cats.forEach(c => addCatSelect.add(new Option(c, c)));
 
   addProtSelect.innerHTML = '<option value="">— Select —</option>';
   prots.forEach(p => addProtSelect.add(new Option(p, p)));
 }
 
-// ── Persistence ──────────────────────────────────────────────────────────────
+// Save Data
 function saveData() {
-  localStorage.setItem('my_recipes',     JSON.stringify(recipes));
+  localStorage.setItem('my_recipes', JSON.stringify(recipes));
   localStorage.setItem('my_fav_recipes', JSON.stringify([...favorites]));
 }
 
-// ── Filtering ────────────────────────────────────────────────────────────────
+// Filter and Render
 function getFilteredRecipes() {
-  const q    = qInput.value.toLowerCase().trim();
-  const cat  = catSelect.value;
+  const q = qInput.value.toLowerCase().trim();
+  const cat = catSelect.value;
   const prot = protSelect.value;
 
-  return recipes.map((r, i) => ({ ...r, originalIndex: i })).filter(r => {
+  return recipes.map((r, i) => ({...r, originalIndex: i})).filter(r => {
     if (showFavsOnly && !favorites.has(r.originalIndex)) return false;
-    if (cat  && r.category !== cat)  return false;
-    if (prot && r.protein  !== prot) return false;
-    if (q    && !r.title.toLowerCase().includes(q)) return false;
+    if (cat && r.category !== cat) return false;
+    if (prot && r.protein !== prot) return false;
+    if (q && !r.title.toLowerCase().includes(q)) return false;
     return true;
   });
 }
 
-// ── Render ───────────────────────────────────────────────────────────────────
 function render() {
   const filtered = getFilteredRecipes();
   tbody.innerHTML = '';
@@ -1059,9 +716,9 @@ function render() {
     tbody.innerHTML = `<tr><td colspan="6" class="empty"><div class="icon">🔍</div><p>No recipes found matching your filters.</p></td></tr>`;
   } else {
     filtered.forEach(r => {
-      const idx        = r.originalIndex;
+      const idx = r.originalIndex;
       const isSelected = selectedIndexes.has(idx);
-      const isStarred  = favorites.has(idx);
+      const isStarred = favorites.has(idx);
 
       const tr = document.createElement('tr');
       if (isSelected) tr.classList.add('selected');
@@ -1075,15 +732,26 @@ function render() {
         <td><button class="del-btn" data-idx="${idx}" title="Delete recipe">✕</button></td>
       `;
 
+      // Event handlers
       tr.addEventListener('click', (e) => {
-        if (e.target.tagName === 'INPUT' || e.target.classList.contains('star-btn') ||
-            e.target.classList.contains('del-btn') || e.target.tagName === 'A') return;
+        if (e.target.tagName === 'INPUT' || e.target.classList.contains('star-btn') || e.target.classList.contains('del-btn') || e.target.tagName === 'A') return;
         toggleSelect(idx);
       });
 
-      tr.querySelector('input[type="checkbox"]').addEventListener('change', () => toggleSelect(idx));
-      tr.querySelector('.star-btn').addEventListener('click', (e) => { e.stopPropagation(); toggleFav(idx); });
-      tr.querySelector('.del-btn').addEventListener('click',  (e) => { e.stopPropagation(); deleteRecipe(idx); });
+      const chk = tr.querySelector('input[type="checkbox"]');
+      chk.addEventListener('change', () => toggleSelect(idx));
+
+      const starBtn = tr.querySelector('.star-btn');
+      starBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleFav(idx);
+      });
+
+      const delBtn = tr.querySelector('.del-btn');
+      delBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        deleteRecipe(idx);
+      });
 
       tbody.appendChild(tr);
     });
@@ -1092,52 +760,34 @@ function render() {
   updateSelectionState();
 }
 
-// ── Selection ────────────────────────────────────────────────────────────────
 function toggleSelect(idx) {
-  if (selectedIndexes.has(idx)) selectedIndexes.delete(idx);
-  else selectedIndexes.add(idx);
-  render();
-}
-
-function updateSelectionState() {
-  const count = selectedIndexes.size;
-  if (count > 0) {
-    selLabel.style.display = 'inline';
-    selLabel.innerHTML = `<strong>${count}</strong> selected`;
-    openBtn.disabled = false;
+  if (selectedIndexes.has(idx)) {
+    selectedIndexes.delete(idx);
   } else {
-    selLabel.style.display = 'none';
-    openBtn.disabled = true;
+    selectedIndexes.add(idx);
   }
+  render();
 }
 
-selectAllBtn.addEventListener('click', () => {
-  const filtered    = getFilteredRecipes();
-  const allSelected = filtered.every(r => selectedIndexes.has(r.originalIndex));
-  filtered.forEach(r => {
-    if (allSelected) selectedIndexes.delete(r.originalIndex);
-    else             selectedIndexes.add(r.originalIndex);
-  });
-  render();
-});
-
-// ── Favorites ────────────────────────────────────────────────────────────────
 function toggleFav(idx) {
-  if (favorites.has(idx)) favorites.delete(idx);
-  else favorites.add(idx);
+  if (favorites.has(idx)) {
+    favorites.delete(idx);
+  } else {
+    favorites.add(idx);
+  }
   saveData();
   render();
 }
 
-// ── Delete / Undo ────────────────────────────────────────────────────────────
 function deleteRecipe(idx) {
   lastDeletedRecipe = recipes[idx];
-  lastDeletedIndex  = idx;
+  lastDeletedIndex = idx;
   recipes.splice(idx, 1);
-
+  
+  // Shift favorite indices if necessary
   const newFavs = new Set();
   favorites.forEach(f => {
-    if (f < idx)      newFavs.add(f);
+    if (f < idx) newFavs.add(f);
     else if (f > idx) newFavs.add(f - 1);
   });
   favorites = newFavs;
@@ -1167,10 +817,34 @@ undoBtn.addEventListener('click', () => {
   }
 });
 
-// ── Open links panel ─────────────────────────────────────────────────────────
+function updateSelectionState() {
+  const count = selectedIndexes.size;
+  if (count > 0) {
+    selLabel.style.display = 'inline';
+    selLabel.innerHTML = `<strong>${count}</strong> selected`;
+    openBtn.disabled = false;
+  } else {
+    selLabel.style.display = 'none';
+    openBtn.disabled = true;
+  }
+}
+
+// Batch Actions
+selectAllBtn.addEventListener('click', () => {
+  const filtered = getFilteredRecipes();
+  const allSelected = filtered.every(r => selectedIndexes.has(r.originalIndex));
+
+  filtered.forEach(r => {
+    if (allSelected) selectedIndexes.delete(r.originalIndex);
+    else selectedIndexes.add(r.originalIndex);
+  });
+  render();
+});
+
+// Open Selected
 openBtn.addEventListener('click', () => {
   const selectedRecipes = [...selectedIndexes].map(i => recipes[i]).filter(Boolean);
-  if (!selectedRecipes.length) return;
+  if (selectedRecipes.length === 0) return;
 
   linkList.innerHTML = '';
   linkPanelLabel.textContent = `Selected Recipes (${selectedRecipes.length})`;
@@ -1186,19 +860,24 @@ openBtn.addEventListener('click', () => {
   linkPanel.style.display = 'flex';
 });
 
-closeLinkPanel.addEventListener('click', () => { linkPanel.style.display = 'none'; });
+closeLinkPanel.addEventListener('click', () => {
+  linkPanel.style.display = 'none';
+});
 
-// ── Add recipe panel ─────────────────────────────────────────────────────────
+// Add Recipe
 addRecipeToggle.addEventListener('click', () => {
   addPanel.style.display = addPanel.style.display === 'none' ? 'block' : 'none';
 });
-closeAddPanel.addEventListener('click', () => { addPanel.style.display = 'none'; });
+
+closeAddPanel.addEventListener('click', () => {
+  addPanel.style.display = 'none';
+});
 
 addSubmit.addEventListener('click', () => {
-  const title    = document.getElementById('addTitle').value.trim();
-  const url      = document.getElementById('addUrl').value.trim();
+  const title = document.getElementById('addTitle').value.trim();
+  const url = document.getElementById('addUrl').value.trim();
   const category = addCatSelect.value;
-  const protein  = addProtSelect.value;
+  const protein = addProtSelect.value;
 
   if (!title || !url) {
     addMsg.className = 'error';
@@ -1212,13 +891,13 @@ addSubmit.addEventListener('click', () => {
   render();
 
   document.getElementById('addTitle').value = '';
-  document.getElementById('addUrl').value   = '';
-  addMsg.className   = '';
+  document.getElementById('addUrl').value = '';
+  addMsg.className = '';
   addMsg.textContent = 'Recipe added!';
   setTimeout(() => { addMsg.textContent = ''; }, 3000);
 });
 
-// ── Filter controls ───────────────────────────────────────────────────────────
+// Filter Controls
 qInput.addEventListener('input', render);
 catSelect.addEventListener('change', render);
 protSelect.addEventListener('change', render);
@@ -1230,7 +909,7 @@ favFilterBtn.addEventListener('click', () => {
 });
 
 clearBtn.addEventListener('click', () => {
-  qInput.value    = '';
+  qInput.value = '';
   catSelect.value = '';
   protSelect.value = '';
   showFavsOnly = false;
@@ -1239,172 +918,112 @@ clearBtn.addEventListener('click', () => {
   render();
 });
 
-// ── Grocery modal ─────────────────────────────────────────────────────────────
-const BOOKMARKLET_KEY = 'recipe_ingredients_';   // prefix; full key = prefix + url
-
-groceryBtn.addEventListener('click', () => {
-  const selectedRecipes = [...selectedIndexes].map(i => recipes[i]).filter(Boolean);
-  if (!selectedRecipes.length) {
-    alert('Please select at least one recipe using the checkboxes first.');
+// CSV Export
+exportBtn.addEventListener('click', () => {
+  const visible = getFilteredRecipes();
+  if (visible.length === 0) {
+    alert("No recipes available to export.");
     return;
   }
 
-  ingredientInputs.innerHTML = '';
-  groceryResultSection.style.display = 'none';
-
-  selectedRecipes.forEach((r, idx) => {
-    // Check if the bookmarklet already saved ingredients for this URL
-    const saved = localStorage.getItem(BOOKMARKLET_KEY + r.url);
-
-    const div = document.createElement('div');
-    div.style.marginBottom = '18px';
-    const statusText = saved ? 'ing-saved' : '';
-    div.innerHTML =
-      '<div class="ing-label-row">' +
-        '<label>' + r.title + '</label>' +
-        '<span class="fetch-status ' + (saved ? 'ok' : '') + '" id="fetch-status-' + idx + '">' +
-          (saved ? '✓ Loaded from bookmarklet' : 'Run bookmarklet on recipe tab, then reopen this') +
-        '</span>' +
-        '<button class="fetch-btn" data-idx="' + idx + '" style="margin-left:auto" ' +
-          'title="Clear saved ingredients for this recipe" ' +
-          'id="clear-saved-' + idx + '"' + (saved ? '' : ' style="display:none"') + '>✕ Clear</button>' +
-      '</div>' +
-      '<textarea id="ing-' + idx + '" data-title="' + r.title + '" data-url="' + r.url + '"' +
-        ' placeholder="Run the bookmarklet on the recipe tab, then reopen Grocery List here…"' +
-        ' style="width:100%; height:90px; box-sizing:border-box; background:var(--bg); border:1px solid var(--border); border-radius:var(--radius); color:var(--text); font-family:var(--ff-body); font-size:13px; padding:8px; outline:none; resize:vertical;">' +
-        (saved ? saved : '') +
-      '</textarea>';
-
-    ingredientInputs.appendChild(div);
-
-    // Clear button removes the saved data for this recipe
-    const clearBtn2 = div.querySelector('[id^="clear-saved-"]');
-    if (clearBtn2) {
-      clearBtn2.addEventListener('click', () => {
-        localStorage.removeItem(BOOKMARKLET_KEY + r.url);
-        div.querySelector('textarea').value = '';
-        div.querySelector('[id^="fetch-status-"]').textContent = 'Cleared — run bookmarklet again to reload';
-        div.querySelector('[id^="fetch-status-"]').className = 'fetch-status';
-        clearBtn2.style.display = 'none';
-      });
-    }
+  let csvContent = "data:text/csv;charset=utf-8,Title,URL,Category,Protein\n";
+  visible.forEach(r => {
+    const title = `"${(r.title || '').replace(/"/g, '""')}"`;
+    const url = `"${(r.url || '').replace(/"/g, '""')}"`;
+    const cat = `"${(r.category || '').replace(/"/g, '""')}"`;
+    const prot = `"${(r.protein || '').replace(/"/g, '""')}"`;
+    csvContent += `${title},${url},${cat},${prot}\n`;
   });
 
-  groceryModal.style.display = 'flex';
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", "recipe_bookmarks.csv");
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 });
 
-// ── Ingredient scraper removed (using bookmarklet approach) ─────────────────
+// CSV Import
+importBtn.addEventListener('click', () => importFileInput.click());
 
-// Pull recipeIngredient from JSON-LD schema.org blocks embedded in page HTML
-function extractJsonLdIngredients(html) {
-  const results = [];
-  const scriptRe = /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
-  let m;
-  while ((m = scriptRe.exec(html)) !== null) {
-    try {
-      const parsed = JSON.parse(m[1].trim());
-      const items  = Array.isArray(parsed) ? parsed : [parsed];
-      for (const item of items) {
-        const found = findIngredients(item);
-        if (found.length > 0) { results.push(...found); break; }
-      }
-    } catch { /* malformed JSON, skip */ }
-  }
-  return results;
-}
+importFileInput.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
 
-function findIngredients(obj) {
-  if (!obj || typeof obj !== 'object') return [];
-  const t     = obj['@type'];
-  const types = (Array.isArray(t) ? t : [t]).map(x => String(x).toLowerCase());
-  if (types.some(x => x.includes('recipe'))) {
-    const ings = obj['recipeIngredient'] || obj['ingredients'] || [];
-    if (Array.isArray(ings) && ings.length > 0) return ings.map(s => String(s).trim()).filter(Boolean);
-  }
-  for (const val of Object.values(obj)) {
-    if (val && typeof val === 'object') {
-      const nested = findIngredients(val);
-      if (nested.length > 0) return nested;
-    }
-  }
-  return [];
-}
+  const reader = new FileReader();
+  reader.onload = (evt) => {
+    const text = evt.target.result;
+    const lines = text.split(/\r\n|\n/);
+    let importedCount = 0;
 
-closeGroceryModalBtn.addEventListener('click', () => { groceryModal.style.display = 'none'; });
-
-function categorizeIngredient(line) {
-  const l = line.toLowerCase();
-  if (l.match(/milk|butter|cheese|cream|egg|yogurt|sour cream/))                          return 'REFRIGERATED & DAIRY';
-  if (l.match(/chicken|beef|pork|steak|turkey|bacon|sausage|fish|salmon|shrimp/))         return 'MEAT & SEAFOOD';
-  if (l.match(/onion|garlic|tomato|potato|lemon|lime|herb|basil|parsley|lettuce|spinach|carrot|celery/)) return 'PRODUCE';
-  if (l.match(/flour|sugar|salt|pepper|oil|vinegar|baking|vanilla|cinnamon|spice|sauce|rice|pasta/))     return 'PANTRY & BAKING';
-  return 'MISCELLANEOUS';
-}
-
-buildListBtn.addEventListener('click', () => {
-  const textareas = ingredientInputs.querySelectorAll('textarea');
-  const categories = {
-    'PRODUCE':             [],
-    'MEAT & SEAFOOD':      [],
-    'REFRIGERATED & DAIRY':[],
-    'PANTRY & BAKING':     [],
-    'MISCELLANEOUS':       []
-  };
-  const recipeNames = [];
-
-  textareas.forEach(ta => {
-    recipeNames.push(ta.dataset.title);
-    ta.value.split('\n').forEach(line => {
-      const clean = line.trim().replace(/^[-•\d+.]+\s*/, '');
-      if (clean) {
-        const cat = categorizeIngredient(clean);
-        if (!categories[cat].includes(clean)) categories[cat].push(clean);
+    lines.forEach((line, index) => {
+      if (index === 0 && line.toLowerCase().includes('title')) return; // skip header
+      const cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.replace(/^"|"$/g, '').trim());
+      if (cols.length >= 2 && cols[0] && cols[1]) {
+        recipes.unshift({
+          title: cols[0],
+          url: cols[1],
+          category: cols[2] || 'Uncategorized',
+          protein: cols[3] || 'N/A'
+        });
+        importedCount++;
       }
     });
-  });
 
-  const today = new Date().toISOString().split('T')[0];
-  let output = `🛒 GROCERY LIST (${today})\nRecipes: ${recipeNames.join(', ')}\n\n`;
+    if (importedCount > 0) {
+      saveData();
+      populateDropdowns();
+      render();
+      alert(`Successfully imported ${importedCount} recipes!`);
+    } else {
+      alert("No valid recipe rows found in the CSV file.");
+    }
+    importFileInput.value = '';
+  };
+  reader.readAsText(file);
+});
 
-  for (const [cat, items] of Object.entries(categories)) {
-    if (items.length > 0) {
-      output += `${cat}\n`;
-      items.forEach(item => { output += `- [ ] ${item}\n`; });
-      output += '\n';
+// Init
+populateDropdowns();
+// Listen for new recipes sent from the extension
+// Cross-browser compatibility wrapper
+const browserAPI = typeof browser !== "undefined" ? browser : chrome;
+
+// Synchronize storage across popup and dashboard
+async function syncRecipesFromStorage() {
+  if (browserAPI && browserAPI.storage) {
+    const data = await browserAPI.storage.local.get("my_recipes");
+    if (data.my_recipes) {
+      recipes = data.my_recipes;
+      localStorage.setItem('my_recipes', JSON.stringify(recipes));
+      populateDropdowns();
+      render();
     }
   }
+}
 
-  formattedListText = output.trim();
-  groceryPreview.textContent = formattedListText;
-  groceryResultSection.style.display = 'block';
-});
+// Initial Sync
+syncRecipesFromStorage();
 
-copyGroceryBtn.addEventListener('click', () => {
-  navigator.clipboard.writeText(formattedListText)
-    .then(() => { alert('✓ Grocery list copied! Paste into Apple Notes or Google Keep.'); })
-    .catch(err => { console.error('Copy failed:', err); });
-});
-
-// ── Browser extension bridge (optional) ──────────────────────────────────────
-window.addEventListener('ExtensionAddRecipe', (e) => {
+// Listen for custom events dispatched by content.js
+window.addEventListener("ExtensionAddRecipe", (e) => {
   if (e.detail) {
-    recipes.unshift(e.detail);
+    const newRecipe = e.detail;
+    
+    // Add new recipe to the top of the array
+    recipes.unshift(newRecipe);
+    
+    // Save to local storage and refresh the UI
     saveData();
     populateDropdowns();
     render();
-    console.log('✓ Added recipe from extension:', e.detail.title);
+
+    console.log("✓ Added recipe from extension:", newRecipe.title);
   }
 });
 
-// ── Boot ─────────────────────────────────────────────────────────────────────
-// Warn if opened as file:// (all fetch() calls will be CORS-blocked)
-if (location.protocol === 'file:') {
-  const banner = document.createElement('div');
-  banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#8a3a00;color:#fff;font-size:13px;padding:8px 20px;text-align:center;';
-  banner.innerHTML = '⚠️ Running as a local file — GitHub sync and ingredient auto-fetch require the page to be served over HTTP. <strong>Use the GitHub Pages version at zarnirob.github.io for full functionality.</strong> <button onclick="this.parentElement.remove()" style="margin-left:16px;background:#fff3;border:none;color:#fff;cursor:pointer;padding:2px 8px;border-radius:4px;">✕</button>';
-  document.body.prepend(banner);
-}
-
+// Initial Render
 populateDropdowns();
 render();
 </script>
