@@ -743,9 +743,14 @@ let toastTimer = null;
 let formattedListText = '';
 let fileSHA = localStorage.getItem('github_file_sha') || '';
 
-let repoOwner = localStorage.getItem('github_owner') || '';
-let repoName  = localStorage.getItem('github_repo')  || '';
-let filePath  = localStorage.getItem('github_path')  || 'data/recipes.csv';
+const DEFAULT_PAT   = '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';
+const DEFAULT_OWNER = 'zarnirob';
+const DEFAULT_REPO  = 'Applications';
+const DEFAULT_PATH  = 'data/recipes.csv';
+
+let repoOwner = localStorage.getItem('github_owner') || DEFAULT_OWNER;
+let repoName  = localStorage.getItem('github_repo')  || DEFAULT_REPO;
+let filePath  = localStorage.getItem('github_path')  || DEFAULT_PATH;
 
 // ── DOM refs ─────────────────────────────────────────────────────────────────
 const qInput           = document.getElementById('q');
@@ -793,7 +798,7 @@ const fetchGithubBtn        = document.getElementById('fetchGithubBtn');
 const syncGithubBtn         = document.getElementById('syncGithubBtn');
 
 // ── Init settings fields ─────────────────────────────────────────────────────
-patInput.value   = localStorage.getItem('github_pat')   || '';
+patInput.value   = localStorage.getItem('github_pat')   || DEFAULT_PAT;
 ownerInput.value = repoOwner;
 repoInput.value  = repoName;
 pathInput.value  = filePath;
@@ -815,7 +820,7 @@ savePatBtn.addEventListener('click', () => {
 });
 
 function getPAT() {
-  return localStorage.getItem('github_pat') || patInput.value.trim();
+  return localStorage.getItem('github_pat') || patInput.value.trim() || DEFAULT_PAT;
 }
 
 // ── GitHub helpers ───────────────────────────────────────────────────────────
@@ -1211,99 +1216,133 @@ async function fetchIngredients(idx, url, title) {
 
   btn.disabled       = true;
   status.className   = 'fetch-status';
-  status.textContent = 'Fetching page…';
+  status.textContent = 'Asking AI to fetch recipe…';
 
-  // Step 1: grab page HTML via CORS proxy
-  let pageHtml = null;
-  const proxies = [
-    `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
-    `https://corsproxy.io/?${encodeURIComponent(url)}`
-  ];
-
-  for (const proxyUrl of proxies) {
-    try {
-      const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(15000) });
-      if (!res.ok) continue;
-      // allorigins returns JSON {contents: "..."}, corsproxy returns raw HTML
-      const ct = res.headers.get('content-type') || '';
-      if (ct.includes('application/json')) {
-        const json = await res.json();
-        pageHtml = json.contents || null;
-      } else {
-        pageHtml = await res.text();
-      }
-      if (pageHtml && pageHtml.length > 500) break;
-    } catch (e) {
-      console.warn('Proxy failed:', proxyUrl, e);
-    }
-  }
-
-  if (!pageHtml) {
-    status.className   = 'fetch-status err';
-    status.textContent = '✕ Could not fetch page — paste manually';
-    btn.disabled = false;
-    return;
-  }
-
-  // Step 2: try fast JSON-LD extraction first (no API call needed)
-  status.textContent = 'Parsing structured data…';
-  const fast = extractJsonLdIngredients(pageHtml);
-  if (fast.length > 0) {
-    ta.value           = fast.join('\n');
-    status.className   = 'fetch-status ok';
-    status.textContent = `✓ ${fast.length} ingredients found`;
-    btn.disabled = false;
-    return;
-  }
-
-  // Step 3: fall back to Claude to extract from raw page text
-  status.textContent = 'Extracting with AI…';
-  const pageText = pageHtml
-    .replace(/<script[\s\S]*?<\/script>/gi, '')
-    .replace(/<style[\s\S]*?<\/style>/gi, '')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s{2,}/g, ' ')
-    .trim()
-    .slice(0, 40000);
-
+  // Primary approach: ask Claude to browse the URL directly using web_search tool.
+  // This sidesteps CORS entirely — Claude fetches server-side.
   try {
     const apiRes = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
-        max_tokens: 1000,
+        max_tokens: 1024,
+        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
         messages: [{
           role: 'user',
-          content: `Extract the ingredients list from this recipe page. Return ONLY the ingredients, one per line, with quantities (e.g. "2 tbsp olive oil"). No headers, no instructions, no commentary.\n\nRecipe: ${title}\n\nPage text:\n${pageText}`
+          content: `Please look up this recipe URL and extract the ingredients list: ${url}\n\nReturn ONLY the ingredients, one per line, with quantities (e.g. "2 tbsp olive oil"). No headers, no instructions, no explanation — just the ingredient lines.`
         }]
       })
     });
 
     const data = await apiRes.json();
-    const text = data?.content?.[0]?.text?.trim();
+    console.log('Claude response:', JSON.stringify(data).slice(0, 500));
+
+    // Find the final text block (Claude's answer after tool use)
+    const textBlock = data?.content?.filter(b => b.type === 'text').pop();
+    const text = textBlock?.text?.trim();
 
     if (text && text.length > 10) {
-      ta.value           = text;
-      const lineCount    = text.split('\n').filter(l => l.trim()).length;
+      ta.value = text;
+      const lineCount = text.split('\n').filter(l => l.trim()).length;
       status.className   = 'fetch-status ok';
       status.textContent = `✓ ${lineCount} ingredients extracted`;
-    } else {
-      throw new Error('Empty response from Claude');
+      btn.disabled = false;
+      return;
     }
   } catch (err) {
-    console.error('Claude extraction failed:', err);
-    status.className   = 'fetch-status err';
-    status.textContent = '✕ AI extraction failed — paste manually';
+    console.warn('Claude web_search approach failed:', err);
   }
 
+  // Fallback: CORS proxy + JSON-LD parse, then Claude text extraction
+  status.textContent = 'Trying proxy fallback…';
+
+  let pageHtml = null;
+  const proxies = [
+    { url: `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`, json: true },
+    { url: `https://corsproxy.io/?${encodeURIComponent(url)}`,             json: false },
+    { url: `https://thingproxy.freeboard.io/fetch/${url}`,                 json: false },
+  ];
+
+  for (const proxy of proxies) {
+    try {
+      console.log('Trying proxy:', proxy.url);
+      const res = await fetch(proxy.url, { signal: AbortSignal.timeout(12000) });
+      if (!res.ok) { console.warn('Proxy HTTP error:', res.status); continue; }
+      if (proxy.json) {
+        const json = await res.json();
+        pageHtml = json.contents || null;
+      } else {
+        pageHtml = await res.text();
+      }
+      console.log('Proxy returned bytes:', pageHtml?.length ?? 0);
+      if (pageHtml && pageHtml.length > 1000) break;
+      pageHtml = null; // too short, try next
+    } catch (e) {
+      console.warn('Proxy failed:', proxy.url, e.message);
+    }
+  }
+
+  if (pageHtml) {
+    // Try JSON-LD first (fast, no API)
+    const fast = extractJsonLdIngredients(pageHtml);
+    console.log('JSON-LD ingredients found:', fast.length);
+    if (fast.length > 0) {
+      ta.value           = fast.join('\n');
+      status.className   = 'fetch-status ok';
+      status.textContent = `✓ ${fast.length} ingredients found`;
+      btn.disabled = false;
+      return;
+    }
+
+    // Send page text to Claude for extraction
+    status.textContent = 'Parsing with AI…';
+    const pageText = pageHtml
+      .replace(/<script[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[\s\S]*?<\/style>/gi, '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s{2,}/g, ' ')
+      .trim()
+      .slice(0, 40000);
+
+    console.log('Sending to Claude, text length:', pageText.length);
+    try {
+      const apiRes = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 1024,
+          messages: [{
+            role: 'user',
+            content: `Extract the ingredients list from this recipe page text. Return ONLY the ingredients, one per line, with quantities (e.g. "2 tbsp olive oil"). No headers, no instructions, no commentary.\n\nRecipe: ${title}\n\nPage text:\n${pageText}`
+          }]
+        })
+      });
+      const data = await apiRes.json();
+      console.log('Claude text-extraction response:', JSON.stringify(data).slice(0, 300));
+      const text = data?.content?.[0]?.text?.trim();
+      if (text && text.length > 10) {
+        ta.value = text;
+        const lineCount = text.split('\n').filter(l => l.trim()).length;
+        status.className   = 'fetch-status ok';
+        status.textContent = `✓ ${lineCount} ingredients extracted`;
+        btn.disabled = false;
+        return;
+      }
+    } catch (err) {
+      console.error('Claude text extraction failed:', err);
+    }
+  }
+
+  status.className   = 'fetch-status err';
+  status.textContent = '✕ Auto-fetch failed — paste manually (check console for details)';
   btn.disabled = false;
 }
 
-// Fast path: pull recipeIngredient from JSON-LD schema.org data embedded in page
+// Pull recipeIngredient from JSON-LD schema.org blocks embedded in page HTML
 function extractJsonLdIngredients(html) {
   const results = [];
-  // Match all application/ld+json script blocks
   const scriptRe = /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
   let m;
   while ((m = scriptRe.exec(html)) !== null) {
@@ -1321,13 +1360,12 @@ function extractJsonLdIngredients(html) {
 
 function findIngredients(obj) {
   if (!obj || typeof obj !== 'object') return [];
-  const t = obj['@type'];
+  const t     = obj['@type'];
   const types = (Array.isArray(t) ? t : [t]).map(x => String(x).toLowerCase());
   if (types.some(x => x.includes('recipe'))) {
     const ings = obj['recipeIngredient'] || obj['ingredients'] || [];
     if (Array.isArray(ings) && ings.length > 0) return ings.map(s => String(s).trim()).filter(Boolean);
   }
-  // Recurse into nested objects (e.g. @graph arrays)
   for (const val of Object.values(obj)) {
     if (val && typeof val === 'object') {
       const nested = findIngredients(val);
@@ -1344,68 +1382,4 @@ function categorizeIngredient(line) {
   if (l.match(/milk|butter|cheese|cream|egg|yogurt|sour cream/))                          return 'REFRIGERATED & DAIRY';
   if (l.match(/chicken|beef|pork|steak|turkey|bacon|sausage|fish|salmon|shrimp/))         return 'MEAT & SEAFOOD';
   if (l.match(/onion|garlic|tomato|potato|lemon|lime|herb|basil|parsley|lettuce|spinach|carrot|celery/)) return 'PRODUCE';
-  if (l.match(/flour|sugar|salt|pepper|oil|vinegar|baking|vanilla|cinnamon|spice|sauce|rice|pasta/))     return 'PANTRY & BAKING';
-  return 'MISCELLANEOUS';
-}
-
-buildListBtn.addEventListener('click', () => {
-  const textareas = ingredientInputs.querySelectorAll('textarea');
-  const categories = {
-    'PRODUCE':             [],
-    'MEAT & SEAFOOD':      [],
-    'REFRIGERATED & DAIRY':[],
-    'PANTRY & BAKING':     [],
-    'MISCELLANEOUS':       []
-  };
-  const recipeNames = [];
-
-  textareas.forEach(ta => {
-    recipeNames.push(ta.dataset.title);
-    ta.value.split('\n').forEach(line => {
-      const clean = line.trim().replace(/^[-•\d+.]+\s*/, '');
-      if (clean) {
-        const cat = categorizeIngredient(clean);
-        if (!categories[cat].includes(clean)) categories[cat].push(clean);
-      }
-    });
-  });
-
-  const today = new Date().toISOString().split('T')[0];
-  let output = `🛒 GROCERY LIST (${today})\nRecipes: ${recipeNames.join(', ')}\n\n`;
-
-  for (const [cat, items] of Object.entries(categories)) {
-    if (items.length > 0) {
-      output += `${cat}\n`;
-      items.forEach(item => { output += `- [ ] ${item}\n`; });
-      output += '\n';
-    }
-  }
-
-  formattedListText = output.trim();
-  groceryPreview.textContent = formattedListText;
-  groceryResultSection.style.display = 'block';
-});
-
-copyGroceryBtn.addEventListener('click', () => {
-  navigator.clipboard.writeText(formattedListText)
-    .then(() => { alert('✓ Grocery list copied! Paste into Apple Notes or Google Keep.'); })
-    .catch(err => { console.error('Copy failed:', err); });
-});
-
-// ── Browser extension bridge (optional) ──────────────────────────────────────
-window.addEventListener('ExtensionAddRecipe', (e) => {
-  if (e.detail) {
-    recipes.unshift(e.detail);
-    saveData();
-    populateDropdowns();
-    render();
-    console.log('✓ Added recipe from extension:', e.detail.title);
-  }
-});
-
-// ── Boot ─────────────────────────────────────────────────────────────────────
-populateDropdowns();
-render();
-</script>
-</body>
-</html>
+  if (l.match(/flour|sugar|salt|pepper|oil|vinegar|baking|vanilla|cinnamon|spice|sauce|rice|pasta/
