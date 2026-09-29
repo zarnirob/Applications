@@ -630,6 +630,8 @@ input[type=checkbox]:checked::after {
     <input type="text" id="repoInput" placeholder="MyRepo" style="width: 120px;">
     <label><strong>Path:</strong></label>
     <input type="text" id="pathInput" placeholder="data/recipes.csv" style="width: 140px;">
+    <label><strong>Worker URL:</strong></label>
+    <input type="text" id="workerUrlInput" placeholder="https://your-worker.workers.dev" style="width: 260px;">
     <button class="btn btn-primary" id="savePatBtn">Save Settings</button>
   </div>
 
@@ -743,6 +745,9 @@ let toastTimer = null;
 let formattedListText = '';
 let fileSHA = localStorage.getItem('github_file_sha') || '';
 
+const WORKER_URL_KEY = 'worker_url';
+let workerUrl = localStorage.getItem(WORKER_URL_KEY) || '';
+
 const DEFAULT_PAT   = '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';
 const DEFAULT_OWNER = 'zarnirob';
 const DEFAULT_REPO  = 'Applications';
@@ -798,6 +803,7 @@ const fetchGithubBtn        = document.getElementById('fetchGithubBtn');
 const syncGithubBtn         = document.getElementById('syncGithubBtn');
 
 // ── Init settings fields ─────────────────────────────────────────────────────
+document.getElementById('workerUrlInput').value = workerUrl;
 patInput.value   = localStorage.getItem('github_pat')   || DEFAULT_PAT;
 ownerInput.value = repoOwner;
 repoInput.value  = repoName;
@@ -813,6 +819,8 @@ savePatBtn.addEventListener('click', () => {
   localStorage.setItem('github_owner', ownerInput.value.trim());
   localStorage.setItem('github_repo',  repoInput.value.trim());
   localStorage.setItem('github_path',  pathInput.value.trim() || 'data/recipes.csv');
+  workerUrl = document.getElementById('workerUrlInput').value.trim();
+  localStorage.setItem(WORKER_URL_KEY, workerUrl);
   repoOwner = localStorage.getItem('github_owner');
   repoName  = localStorage.getItem('github_repo');
   filePath  = localStorage.getItem('github_path');
@@ -1232,6 +1240,8 @@ clearBtn.addEventListener('click', () => {
 });
 
 // ── Grocery modal ─────────────────────────────────────────────────────────────
+const BOOKMARKLET_KEY = 'recipe_ingredients_';   // prefix; full key = prefix + url
+
 groceryBtn.addEventListener('click', () => {
   const selectedRecipes = [...selectedIndexes].map(i => recipes[i]).filter(Boolean);
   if (!selectedRecipes.length) {
@@ -1243,157 +1253,47 @@ groceryBtn.addEventListener('click', () => {
   groceryResultSection.style.display = 'none';
 
   selectedRecipes.forEach((r, idx) => {
+    // Check if the bookmarklet already saved ingredients for this URL
+    const saved = localStorage.getItem(BOOKMARKLET_KEY + r.url);
+
     const div = document.createElement('div');
     div.style.marginBottom = '18px';
-    div.innerHTML = `
-      <div class="ing-label-row">
-        <label>${r.title}</label>
-        <button class="fetch-btn" data-idx="${idx}" data-url="${r.url}">⬇ Auto-fetch ingredients</button>
-        <span class="fetch-status" id="fetch-status-${idx}"></span>
-      </div>
-      <textarea id="ing-${idx}" data-title="${r.title}"
-        placeholder="Click Auto-fetch, or paste ingredients manually here…"
-        style="width:100%; height:90px; box-sizing:border-box; background:var(--bg); border:1px solid var(--border); border-radius:var(--radius); color:var(--text); font-family:var(--ff-body); font-size:13px; padding:8px; outline:none; resize:vertical;"></textarea>
-    `;
+    const statusText = saved ? 'ing-saved' : '';
+    div.innerHTML =
+      '<div class="ing-label-row">' +
+        '<label>' + r.title + '</label>' +
+        '<span class="fetch-status ' + (saved ? 'ok' : '') + '" id="fetch-status-' + idx + '">' +
+          (saved ? '✓ Loaded from bookmarklet' : 'Run bookmarklet on recipe tab, then reopen this') +
+        '</span>' +
+        '<button class="fetch-btn" data-idx="' + idx + '" style="margin-left:auto" ' +
+          'title="Clear saved ingredients for this recipe" ' +
+          'id="clear-saved-' + idx + '"' + (saved ? '' : ' style="display:none"') + '>✕ Clear</button>' +
+      '</div>' +
+      '<textarea id="ing-' + idx + '" data-title="' + r.title + '" data-url="' + r.url + '"' +
+        ' placeholder="Run the bookmarklet on the recipe tab, then reopen Grocery List here…"' +
+        ' style="width:100%; height:90px; box-sizing:border-box; background:var(--bg); border:1px solid var(--border); border-radius:var(--radius); color:var(--text); font-family:var(--ff-body); font-size:13px; padding:8px; outline:none; resize:vertical;">' +
+        (saved ? saved : '') +
+      '</textarea>';
+
     ingredientInputs.appendChild(div);
 
-    div.querySelector('.fetch-btn').addEventListener('click', () => fetchIngredients(idx, r.url, r.title));
+    // Clear button removes the saved data for this recipe
+    const clearBtn2 = div.querySelector('[id^="clear-saved-"]');
+    if (clearBtn2) {
+      clearBtn2.addEventListener('click', () => {
+        localStorage.removeItem(BOOKMARKLET_KEY + r.url);
+        div.querySelector('textarea').value = '';
+        div.querySelector('[id^="fetch-status-"]').textContent = 'Cleared — run bookmarklet again to reload';
+        div.querySelector('[id^="fetch-status-"]').className = 'fetch-status';
+        clearBtn2.style.display = 'none';
+      });
+    }
   });
 
   groceryModal.style.display = 'flex';
 });
 
-// ── Ingredient scraper ────────────────────────────────────────────────────────
-async function fetchIngredients(idx, url, title) {
-  const btn    = document.querySelector(`.fetch-btn[data-idx="${idx}"]`);
-  const status = document.getElementById(`fetch-status-${idx}`);
-  const ta     = document.getElementById(`ing-${idx}`);
-
-  btn.disabled       = true;
-  status.className   = 'fetch-status';
-  status.textContent = 'Asking AI to fetch recipe…';
-
-  // Primary approach: ask Claude to browse the URL directly using web_search tool.
-  // This sidesteps CORS entirely — Claude fetches server-side.
-  try {
-    const apiRes = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1024,
-        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-        messages: [{
-          role: 'user',
-          content: `Please look up this recipe URL and extract the ingredients list: ${url}\n\nReturn ONLY the ingredients, one per line, with quantities (e.g. "2 tbsp olive oil"). No headers, no instructions, no explanation — just the ingredient lines.`
-        }]
-      })
-    });
-
-    const data = await apiRes.json();
-    console.log('Claude response:', JSON.stringify(data).slice(0, 500));
-
-    // Find the final text block (Claude's answer after tool use)
-    const textBlock = data?.content?.filter(b => b.type === 'text').pop();
-    const text = textBlock?.text?.trim();
-
-    if (text && text.length > 10) {
-      ta.value = text;
-      const lineCount = text.split('\n').filter(l => l.trim()).length;
-      status.className   = 'fetch-status ok';
-      status.textContent = `✓ ${lineCount} ingredients extracted`;
-      btn.disabled = false;
-      return;
-    }
-  } catch (err) {
-    console.warn('Claude web_search approach failed:', err);
-  }
-
-  // Fallback: CORS proxy + JSON-LD parse, then Claude text extraction
-  status.textContent = 'Trying proxy fallback…';
-
-  let pageHtml = null;
-  const proxies = [
-    { url: `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`, json: true },
-    { url: `https://corsproxy.io/?${encodeURIComponent(url)}`,             json: false },
-    { url: `https://thingproxy.freeboard.io/fetch/${url}`,                 json: false },
-  ];
-
-  for (const proxy of proxies) {
-    try {
-      console.log('Trying proxy:', proxy.url);
-      const res = await fetch(proxy.url, { signal: AbortSignal.timeout(12000) });
-      if (!res.ok) { console.warn('Proxy HTTP error:', res.status); continue; }
-      if (proxy.json) {
-        const json = await res.json();
-        pageHtml = json.contents || null;
-      } else {
-        pageHtml = await res.text();
-      }
-      console.log('Proxy returned bytes:', pageHtml?.length ?? 0);
-      if (pageHtml && pageHtml.length > 1000) break;
-      pageHtml = null; // too short, try next
-    } catch (e) {
-      console.warn('Proxy failed:', proxy.url, e.message);
-    }
-  }
-
-  if (pageHtml) {
-    // Try JSON-LD first (fast, no API)
-    const fast = extractJsonLdIngredients(pageHtml);
-    console.log('JSON-LD ingredients found:', fast.length);
-    if (fast.length > 0) {
-      ta.value           = fast.join('\n');
-      status.className   = 'fetch-status ok';
-      status.textContent = `✓ ${fast.length} ingredients found`;
-      btn.disabled = false;
-      return;
-    }
-
-    // Send page text to Claude for extraction
-    status.textContent = 'Parsing with AI…';
-    const pageText = pageHtml
-      .replace(/<script[\s\S]*?<\/script>/gi, '')
-      .replace(/<style[\s\S]*?<\/style>/gi, '')
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/\s{2,}/g, ' ')
-      .trim()
-      .slice(0, 40000);
-
-    console.log('Sending to Claude, text length:', pageText.length);
-    try {
-      const apiRes = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-6',
-          max_tokens: 1024,
-          messages: [{
-            role: 'user',
-            content: `Extract the ingredients list from this recipe page text. Return ONLY the ingredients, one per line, with quantities (e.g. "2 tbsp olive oil"). No headers, no instructions, no commentary.\n\nRecipe: ${title}\n\nPage text:\n${pageText}`
-          }]
-        })
-      });
-      const data = await apiRes.json();
-      console.log('Claude text-extraction response:', JSON.stringify(data).slice(0, 300));
-      const text = data?.content?.[0]?.text?.trim();
-      if (text && text.length > 10) {
-        ta.value = text;
-        const lineCount = text.split('\n').filter(l => l.trim()).length;
-        status.className   = 'fetch-status ok';
-        status.textContent = `✓ ${lineCount} ingredients extracted`;
-        btn.disabled = false;
-        return;
-      }
-    } catch (err) {
-      console.error('Claude text extraction failed:', err);
-    }
-  }
-
-  status.className   = 'fetch-status err';
-  status.textContent = '✕ Auto-fetch failed — paste manually (check console for details)';
-  btn.disabled = false;
-}
+// ── Ingredient scraper removed (using bookmarklet approach) ─────────────────
 
 // Pull recipeIngredient from JSON-LD schema.org blocks embedded in page HTML
 function extractJsonLdIngredients(html) {
