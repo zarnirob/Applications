@@ -61,7 +61,7 @@ header .subtitle {
 
 .shell {
   display: grid;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto auto 1fr;
   height: calc(100vh - 57px);
 }
 
@@ -146,6 +146,7 @@ header .subtitle {
   display: flex;
   flex-direction: column;
   padding: 0 28px 20px;
+  min-height: 0;
 }
 
 .statusbar {
@@ -181,6 +182,7 @@ header .subtitle {
 .table-scroll {
   overflow-y: auto;
   flex: 1;
+  min-height: 0;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   margin-top: 2px;
@@ -293,6 +295,7 @@ input[type=checkbox]:checked::after {
 
 .open-bar {
   flex-shrink: 0;
+  padding-bottom: 4px;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -510,6 +513,40 @@ input[type=checkbox]:checked::after {
   overflow-y: auto;
   box-shadow: 0 10px 25px rgba(0,0,0,0.5);
 }
+.fetch-btn {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 11px;
+  font-family: var(--ff-body);
+  padding: 3px 10px;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.fetch-btn:hover { color: var(--accent); border-color: var(--accent-dim); }
+.fetch-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.fetch-status {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+  margin-left: 6px;
+}
+.fetch-status.ok  { color: var(--green); font-style: normal; }
+.fetch-status.err { color: #e05555;      font-style: normal; }
+.ing-label-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 5px;
+  flex-wrap: wrap;
+}
+.ing-label-row label {
+  font-weight: bold;
+  color: var(--accent);
+}
+
 .grocery-preview {
   background: var(--bg);
   padding: 15px;
@@ -675,7 +712,7 @@ input[type=checkbox]:checked::after {
 <div id="groceryModal" class="modal-overlay">
   <div class="modal-card">
     <h2 style="margin-top:0; color:var(--accent);">🛒 Generate Grocery List</h2>
-    <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 15px;">Paste or review ingredients for your selected recipes below:</p>
+    <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 15px;">Click <strong style="color:var(--accent)">Auto-fetch</strong> to scrape ingredients, or paste them manually.</p>
     <div id="ingredientInputs"></div>
     <div style="display: flex; gap: 10px; margin-top: 15px;">
       <button class="btn btn-primary" id="buildListBtn">Build Formatted List</button>
@@ -1147,16 +1184,104 @@ groceryBtn.addEventListener('click', () => {
 
   selectedRecipes.forEach((r, idx) => {
     const div = document.createElement('div');
-    div.style.marginBottom = '15px';
+    div.style.marginBottom = '18px';
     div.innerHTML = `
-      <label style="font-weight:bold; display:block; margin-bottom:5px; color:var(--accent);">${r.title}</label>
-      <textarea id="ing-${idx}" data-title="${r.title}" placeholder="Paste ingredients for ${r.title}..." style="width:100%; height:70px; box-sizing:border-box;"></textarea>
+      <div class="ing-label-row">
+        <label>${r.title}</label>
+        <button class="fetch-btn" data-idx="${idx}" data-url="${r.url}">⬇ Auto-fetch ingredients</button>
+        <span class="fetch-status" id="fetch-status-${idx}"></span>
+      </div>
+      <textarea id="ing-${idx}" data-title="${r.title}"
+        placeholder="Click Auto-fetch, or paste ingredients manually here…"
+        style="width:100%; height:90px; box-sizing:border-box; background:var(--bg); border:1px solid var(--border); border-radius:var(--radius); color:var(--text); font-family:var(--ff-body); font-size:13px; padding:8px; outline:none; resize:vertical;"></textarea>
     `;
     ingredientInputs.appendChild(div);
+
+    div.querySelector('.fetch-btn').addEventListener('click', () => fetchIngredients(idx, r.url, r.title));
   });
 
   groceryModal.style.display = 'flex';
 });
+
+// ── Ingredient scraper ────────────────────────────────────────────────────────
+async function fetchIngredients(idx, url, title) {
+  const btn    = document.querySelector(`.fetch-btn[data-idx="${idx}"]`);
+  const status = document.getElementById(`fetch-status-${idx}`);
+  const ta     = document.getElementById(`ing-${idx}`);
+
+  btn.disabled  = true;
+  status.className = 'fetch-status';
+  status.textContent = 'Fetching page…';
+
+  // Try two CORS proxies in sequence
+  const proxies = [
+    `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+    `https://corsproxy.io/?${encodeURIComponent(url)}`
+  ];
+
+  let html = null;
+  for (const proxy of proxies) {
+    try {
+      const res = await fetch(proxy, { signal: AbortSignal.timeout(12000) });
+      if (!res.ok) continue;
+      const data = await res.json().catch(() => null);
+      // allorigins wraps in {contents:...}, corsproxy returns raw text
+      html = data?.contents ?? await res.text?.() ?? null;
+      if (html && html.length > 500) break;
+    } catch { /* try next proxy */ }
+  }
+
+  if (!html) {
+    status.className   = 'fetch-status err';
+    status.textContent = '✕ Fetch failed — paste manually';
+    btn.disabled = false;
+    return;
+  }
+
+  status.textContent = 'Extracting ingredients with AI…';
+
+  // Strip to a manageable size: keep only text nodes near ingredient keywords
+  // Grab up to ~40k chars to stay within a reasonable prompt
+  const stripped = html
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+    .slice(0, 40000);
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1000,
+        messages: [{
+          role: 'user',
+          content: `Extract only the ingredients list from this recipe page text. Return each ingredient on its own line, with quantity and unit included (e.g. "2 tbsp olive oil"). No section headers, no instructions, no intro text — just the ingredient lines, one per line.\n\nRecipe: ${title}\n\nPage text:\n${stripped}`
+        }]
+      })
+    });
+
+    const data = await response.json();
+    const text = data?.content?.[0]?.text?.trim();
+
+    if (text && text.length > 10) {
+      ta.value = text;
+      status.className   = 'fetch-status ok';
+      status.textContent = '✓ Ingredients loaded';
+    } else {
+      throw new Error('Empty response');
+    }
+  } catch (err) {
+    console.error('Claude extraction failed:', err);
+    status.className   = 'fetch-status err';
+    status.textContent = '✕ AI extraction failed — paste manually';
+  }
+
+  btn.disabled = false;
+}
 
 closeGroceryModalBtn.addEventListener('click', () => { groceryModal.style.display = 'none'; });
 
