@@ -1433,4 +1433,12 @@ window.addEventListener('ExtensionAddRecipe', (e) => {
 if (location.protocol === 'file:') {
   const banner = document.createElement('div');
   banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#8a3a00;color:#fff;font-size:13px;padding:8px 20px;text-align:center;';
-  banner.innerHTML = '⚠️ Running as a local file — GitHub sync and
+  banner.innerHTML = '⚠️ Running as a local file — GitHub sync and ingredient auto-fetch require the page to be served over HTTP. <strong>Use the GitHub Pages version at zarnirob.github.io for full functionality.</strong> <button onclick="this.parentElement.remove()" style="margin-left:16px;background:#fff3;border:none;color:#fff;cursor:pointer;padding:2px 8px;border-radius:4px;">✕</button>';
+  document.body.prepend(banner);
+}
+
+populateDropdowns();
+render();
+</script>
+</body>
+</html>
