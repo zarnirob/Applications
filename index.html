@@ -1209,40 +1209,56 @@ async function fetchIngredients(idx, url, title) {
   const status = document.getElementById(`fetch-status-${idx}`);
   const ta     = document.getElementById(`ing-${idx}`);
 
-  btn.disabled  = true;
-  status.className = 'fetch-status';
+  btn.disabled       = true;
+  status.className   = 'fetch-status';
   status.textContent = 'Fetching page…';
 
-  // Try two CORS proxies in sequence
+  // Step 1: grab page HTML via CORS proxy
+  let pageHtml = null;
   const proxies = [
     `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
     `https://corsproxy.io/?${encodeURIComponent(url)}`
   ];
 
-  let html = null;
-  for (const proxy of proxies) {
+  for (const proxyUrl of proxies) {
     try {
-      const res = await fetch(proxy, { signal: AbortSignal.timeout(12000) });
+      const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(15000) });
       if (!res.ok) continue;
-      const data = await res.json().catch(() => null);
-      // allorigins wraps in {contents:...}, corsproxy returns raw text
-      html = data?.contents ?? await res.text?.() ?? null;
-      if (html && html.length > 500) break;
-    } catch { /* try next proxy */ }
+      // allorigins returns JSON {contents: "..."}, corsproxy returns raw HTML
+      const ct = res.headers.get('content-type') || '';
+      if (ct.includes('application/json')) {
+        const json = await res.json();
+        pageHtml = json.contents || null;
+      } else {
+        pageHtml = await res.text();
+      }
+      if (pageHtml && pageHtml.length > 500) break;
+    } catch (e) {
+      console.warn('Proxy failed:', proxyUrl, e);
+    }
   }
 
-  if (!html) {
+  if (!pageHtml) {
     status.className   = 'fetch-status err';
-    status.textContent = '✕ Fetch failed — paste manually';
+    status.textContent = '✕ Could not fetch page — paste manually';
     btn.disabled = false;
     return;
   }
 
-  status.textContent = 'Extracting ingredients with AI…';
+  // Step 2: try fast JSON-LD extraction first (no API call needed)
+  status.textContent = 'Parsing structured data…';
+  const fast = extractJsonLdIngredients(pageHtml);
+  if (fast.length > 0) {
+    ta.value           = fast.join('\n');
+    status.className   = 'fetch-status ok';
+    status.textContent = `✓ ${fast.length} ingredients found`;
+    btn.disabled = false;
+    return;
+  }
 
-  // Strip to a manageable size: keep only text nodes near ingredient keywords
-  // Grab up to ~40k chars to stay within a reasonable prompt
-  const stripped = html
+  // Step 3: fall back to Claude to extract from raw page text
+  status.textContent = 'Extracting with AI…';
+  const pageText = pageHtml
     .replace(/<script[\s\S]*?<\/script>/gi, '')
     .replace(/<style[\s\S]*?<\/style>/gi, '')
     .replace(/<[^>]+>/g, ' ')
@@ -1251,7 +1267,7 @@ async function fetchIngredients(idx, url, title) {
     .slice(0, 40000);
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const apiRes = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1259,20 +1275,21 @@ async function fetchIngredients(idx, url, title) {
         max_tokens: 1000,
         messages: [{
           role: 'user',
-          content: `Extract only the ingredients list from this recipe page text. Return each ingredient on its own line, with quantity and unit included (e.g. "2 tbsp olive oil"). No section headers, no instructions, no intro text — just the ingredient lines, one per line.\n\nRecipe: ${title}\n\nPage text:\n${stripped}`
+          content: `Extract the ingredients list from this recipe page. Return ONLY the ingredients, one per line, with quantities (e.g. "2 tbsp olive oil"). No headers, no instructions, no commentary.\n\nRecipe: ${title}\n\nPage text:\n${pageText}`
         }]
       })
     });
 
-    const data = await response.json();
+    const data = await apiRes.json();
     const text = data?.content?.[0]?.text?.trim();
 
     if (text && text.length > 10) {
-      ta.value = text;
+      ta.value           = text;
+      const lineCount    = text.split('\n').filter(l => l.trim()).length;
       status.className   = 'fetch-status ok';
-      status.textContent = '✓ Ingredients loaded';
+      status.textContent = `✓ ${lineCount} ingredients extracted`;
     } else {
-      throw new Error('Empty response');
+      throw new Error('Empty response from Claude');
     }
   } catch (err) {
     console.error('Claude extraction failed:', err);
@@ -1281,6 +1298,43 @@ async function fetchIngredients(idx, url, title) {
   }
 
   btn.disabled = false;
+}
+
+// Fast path: pull recipeIngredient from JSON-LD schema.org data embedded in page
+function extractJsonLdIngredients(html) {
+  const results = [];
+  // Match all application/ld+json script blocks
+  const scriptRe = /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+  let m;
+  while ((m = scriptRe.exec(html)) !== null) {
+    try {
+      const parsed = JSON.parse(m[1].trim());
+      const items  = Array.isArray(parsed) ? parsed : [parsed];
+      for (const item of items) {
+        const found = findIngredients(item);
+        if (found.length > 0) { results.push(...found); break; }
+      }
+    } catch { /* malformed JSON, skip */ }
+  }
+  return results;
+}
+
+function findIngredients(obj) {
+  if (!obj || typeof obj !== 'object') return [];
+  const t = obj['@type'];
+  const types = (Array.isArray(t) ? t : [t]).map(x => String(x).toLowerCase());
+  if (types.some(x => x.includes('recipe'))) {
+    const ings = obj['recipeIngredient'] || obj['ingredients'] || [];
+    if (Array.isArray(ings) && ings.length > 0) return ings.map(s => String(s).trim()).filter(Boolean);
+  }
+  // Recurse into nested objects (e.g. @graph arrays)
+  for (const val of Object.values(obj)) {
+    if (val && typeof val === 'object') {
+      const nested = findIngredients(val);
+      if (nested.length > 0) return nested;
+    }
+  }
+  return [];
 }
 
 closeGroceryModalBtn.addEventListener('click', () => { groceryModal.style.display = 'none'; });
