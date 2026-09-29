@@ -1432,21 +1432,24 @@ window.addEventListener('ExtensionAddRecipe', (e) => {
     function tryAutoSelect() {
       // First try: exact URL match (normalized)
       var matchIdx = recipes.findIndex(function(r) { return normalizeUrl(r.url) === pendingUrl; });
+      console.log('[bookmarklet] URL match result:', matchIdx, '| looking for:', pendingUrl);
       // Second try: title match (handles flip.it and other redirect aliases)
       if (matchIdx === -1 && normTitle) {
+        console.log('[bookmarklet] Trying title match. normTitle:', normTitle);
         matchIdx = recipes.findIndex(function(r) {
           var rt = normalizeTitle(r.title);
-          // Accept if one title contains the other, or they share 80%+ of words
+          console.log('[bookmarklet]   comparing vs:', rt);
           if (rt === normTitle) return true;
           if (rt.includes(normTitle) || normTitle.includes(rt)) return true;
-          // Use the shorter title's meaningful words and check against the longer
           var shorter = normTitle.length <= rt.length ? normTitle : rt;
           var longer  = normTitle.length <= rt.length ? rt : normTitle;
           var words = shorter.split(' ').filter(function(w){ return w.length > 3 && ['recipe','easy','best','with','from','your'].indexOf(w) === -1; });
           if (words.length === 0) return false;
           var matches = words.filter(function(w){ return longer.includes(w); }).length;
+          console.log('[bookmarklet]   words:', words, 'matches:', matches + '/' + words.length);
           return matches / words.length >= 0.75;
         });
+        console.log('[bookmarklet] Title match result:', matchIdx);
       }
       if (matchIdx !== -1) {
         selectedIndexes.add(matchIdx);
