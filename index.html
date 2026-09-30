@@ -1441,13 +1441,17 @@ window.addEventListener('ExtensionAddRecipe', (e) => {
           console.log('[bookmarklet]   comparing vs:', rt);
           if (rt === normTitle) return true;
           if (rt.includes(normTitle) || normTitle.includes(rt)) return true;
-          var shorter = normTitle.length <= rt.length ? normTitle : rt;
-          var longer  = normTitle.length <= rt.length ? rt : normTitle;
-          var words = shorter.split(' ').filter(function(w){ return w.length > 3 && ['recipe','easy','best','with','from','your'].indexOf(w) === -1; });
-          if (words.length === 0) return false;
-          var matches = words.filter(function(w){ return longer.includes(w); }).length;
-          console.log('[bookmarklet]   words:', words, 'matches:', matches + '/' + words.length);
-          return matches / words.length >= 0.75;
+          // Score: how many meaningful words from EACH title appear in the OTHER
+          var stopwords = ['recipe','easy','best','with','from','your','ever','most','tasted','delicious','homemade','simple','quick','classic','perfect','great'];
+          var wordsA = normTitle.split(' ').filter(function(w){ return w.length > 3 && stopwords.indexOf(w) === -1; });
+          var wordsB = rt.split(' ').filter(function(w){ return w.length > 3 && stopwords.indexOf(w) === -1; });
+          if (wordsA.length === 0 || wordsB.length === 0) return false;
+          // Count how many of the SHORTER word list appear in the OTHER title
+          var shorter = wordsA.length <= wordsB.length ? wordsA : wordsB;
+          var longerStr = wordsA.length <= wordsB.length ? rt : normTitle;
+          var matches = shorter.filter(function(w){ return longerStr.includes(w); }).length;
+          console.log('[bookmarklet]   wordsA:', wordsA, 'wordsB:', wordsB, 'matches:', matches + '/' + shorter.length);
+          return matches / shorter.length >= 0.6;
         });
         console.log('[bookmarklet] Title match result:', matchIdx);
       }
