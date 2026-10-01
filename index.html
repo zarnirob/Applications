@@ -664,6 +664,7 @@ input[type=checkbox]:checked::after {
       <button class="btn btn-primary" id="openBtn" disabled>Open selected in tabs</button>
       <button class="btn btn-ghost" style="border-color: var(--green); color: var(--green);" id="groceryBtn">🛒 Grocery List</button>
       <button class="btn btn-ghost" id="addRecipeToggle">＋ Add Recipe</button>
+      <button class="btn btn-ghost" id="fixUrlsBtn" title="Resolve short URLs (flip.it etc) to real URLs">🔗 Fix Short URLs</button>
       <button class="btn btn-ghost" style="border-color: var(--accent); color: var(--accent);" id="syncGithubBtn">💾 Save &amp; Sync All Changes to GitHub</button>
       <span class="hint" id="openHint">Select one or more recipes, then click to open their links.</span>
     </div>
@@ -1194,9 +1195,41 @@ addRecipeToggle.addEventListener('click', () => {
 });
 closeAddPanel.addEventListener('click', () => { addPanel.style.display = 'none'; });
 
-addSubmit.addEventListener('click', () => {
+// ── URL resolver — follows redirects using no-cors fetch trick ────────────────
+async function resolveUrl(url) {
+  // Short URL patterns worth resolving
+  const shortDomains = ['flip.it','bit.ly','tinyurl.com','t.co','ow.ly','buff.ly','goo.gl','tiny.cc','is.gd','rb.gy'];
+  try {
+    const host = new URL(url).hostname.replace('www.','');
+    if (!shortDomains.some(d => host === d || host.endsWith('.' + d))) return url; // not a short URL
+  } catch(e) { return url; }
+
+  try {
+    // no-cors fetch: we can't read the body, but response.url gives the final URL after redirects
+    const res = await fetch(url, { method: 'HEAD', mode: 'no-cors', redirect: 'follow' });
+    // no-cors always gives an opaque response — response.url is empty for opaque
+    // Instead use a tiny redirect-following trick via a CORS-open endpoint
+    const proxyRes = await fetch('https://api.allorigins.win/get?url=' + encodeURIComponent(url), {
+      signal: AbortSignal.timeout(8000)
+    });
+    if (proxyRes.ok) {
+      const data = await proxyRes.json();
+      // allorigins returns the final URL in status.url
+      if (data.status && data.status.url && data.status.url !== url) {
+        const resolved = data.status.url.replace(/\/$/, '');
+        console.log('Resolved', url, '→', resolved);
+        return resolved;
+      }
+    }
+  } catch(e) {
+    console.warn('Could not resolve URL:', url, e.message);
+  }
+  return url; // return original if resolution fails
+}
+
+addSubmit.addEventListener('click', async () => {
   const title    = document.getElementById('addTitle').value.trim();
-  const url      = document.getElementById('addUrl').value.trim();
+  let   url      = document.getElementById('addUrl').value.trim();
   const category = addCatSelect.value;
   const protein  = addProtSelect.value;
 
@@ -1205,6 +1238,11 @@ addSubmit.addEventListener('click', () => {
     addMsg.textContent = 'Title and URL are required!';
     return;
   }
+
+  // Resolve short URLs before storing
+  addMsg.className = '';
+  addMsg.textContent = 'Checking URL…';
+  url = await resolveUrl(url);
 
   recipes.unshift({ title, url, category: category || 'Uncategorized', protein: protein || 'N/A' });
   saveData();
@@ -1216,6 +1254,52 @@ addSubmit.addEventListener('click', () => {
   addMsg.className   = '';
   addMsg.textContent = 'Recipe added!';
   setTimeout(() => { addMsg.textContent = ''; }, 3000);
+});
+
+// ── Fix Short URLs — resolves all flip.it / bit.ly etc in the list ────────────
+document.getElementById('fixUrlsBtn').addEventListener('click', async () => {
+  const shortDomains = ['flip.it','bit.ly','tinyurl.com','t.co','ow.ly','buff.ly','goo.gl','tiny.cc','is.gd','rb.gy'];
+  const toFix = recipes.reduce((acc, r, i) => {
+    try {
+      const host = new URL(r.url).hostname.replace('www.','');
+      if (shortDomains.some(d => host === d || host.endsWith('.' + d))) acc.push(i);
+    } catch(e) {}
+    return acc;
+  }, []);
+
+  if (toFix.length === 0) {
+    alert('No short URLs found — all recipe URLs look like full links already.');
+    return;
+  }
+
+  if (!confirm('Found ' + toFix.length + ' short URL(s) to resolve (flip.it etc).\n\nThis will fetch each one to find the real URL. Continue?')) return;
+
+  // Show progress toast
+  const toast = document.createElement('div');
+  toast.style.cssText = 'position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:#2e2e29;border:1px solid #c8873a;border-radius:24px;padding:10px 22px;font-size:13px;color:#e8e4da;z-index:9999;box-shadow:0 4px 24px rgba(0,0,0,0.5);white-space:nowrap;';
+  toast.textContent = 'Resolving 0 / ' + toFix.length + ' URLs…';
+  document.body.appendChild(toast);
+
+  let fixed = 0;
+  for (let n = 0; n < toFix.length; n++) {
+    const idx = toFix[n];
+    toast.textContent = 'Resolving ' + (n + 1) + ' / ' + toFix.length + ': ' + recipes[idx].title.slice(0, 40) + '…';
+    const resolved = await resolveUrl(recipes[idx].url);
+    if (resolved !== recipes[idx].url) {
+      recipes[idx].url = resolved;
+      fixed++;
+    }
+  }
+
+  saveData();
+  render();
+  toast.remove();
+
+  if (fixed > 0) {
+    alert('✓ Fixed ' + fixed + ' URL(s).\n\nDon\'t forget to click 💾 Save & Sync to push the changes to GitHub.');
+  } else {
+    alert('Could not resolve any URLs automatically — they may require a login or block automated requests.');
+  }
 });
 
 // ── Filter controls ───────────────────────────────────────────────────────────
@@ -1420,64 +1504,16 @@ window.addEventListener('ExtensionAddRecipe', (e) => {
     }
     var normReal = normalizeUrl(realUrl);
 
-    // Find the recipe by URL (exact or normalized match)
-    function findByUrl() {
-      return recipes.findIndex(function(r) {
-        return normalizeUrl(r.url) === normReal;
-      });
-    }
-
-    // Show a confirmation dialog listing all recipes so user can pick the right one
-    function showPickerDialog() {
-      var overlay = document.createElement('div');
-      overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.75);z-index:2000;display:flex;align-items:center;justify-content:center;';
-
-      var card = document.createElement('div');
-      card.style.cssText = 'background:var(--surface);border:1px solid var(--accent);border-radius:10px;padding:24px;max-width:560px;width:90%;max-height:80vh;overflow-y:auto;box-shadow:0 10px 40px rgba(0,0,0,0.6);';
-
-      card.innerHTML =
-        '<h3 style="margin:0 0 6px;color:var(--accent);">\uD83E\uDD44 Which recipe is this?</h3>' +
-        '<p style="margin:0 0 16px;font-size:13px;color:var(--text-muted);">' + ingCount + ' ingredients captured from:<br>' +
-        '<code style="font-size:11px;color:var(--green);">' + realUrl + '</code></p>' +
-        '<p style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">Pick the matching recipe — its stored URL will be updated to the real one so this works automatically next time.</p>' +
-        '<div id="picker-list" style="display:flex;flex-direction:column;gap:6px;"></div>' +
-        '<button id="picker-cancel" style="margin-top:16px;background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);padding:8px 18px;border-radius:6px;cursor:pointer;font-size:13px;">Cancel</button>';
-
-      overlay.appendChild(card);
-      document.body.appendChild(overlay);
-
-      var list = card.querySelector('#picker-list');
-      recipes.forEach(function(r, idx) {
-        var btn = document.createElement('button');
-        btn.style.cssText = 'background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 14px;text-align:left;cursor:pointer;color:var(--text);font-size:13px;transition:border-color 0.15s;';
-        btn.innerHTML = '<strong style="color:var(--accent);">' + r.title + '</strong><br>' +
-          '<span style="font-size:11px;color:var(--text-muted);">' + r.url + '</span>';
-        btn.addEventListener('mouseover', function(){ btn.style.borderColor = 'var(--accent)'; });
-        btn.addEventListener('mouseout',  function(){ btn.style.borderColor = 'var(--border)'; });
-        btn.addEventListener('click', function() {
-          // Update the stored URL to the real one and save
-          recipes[idx].url = realUrl;
-          saveData();
-          // Also save ingredients under the old URL key just in case
-          localStorage.setItem('recipe_ingredients_' + r.url, ingText);
-          overlay.remove();
-          // Select and open grocery modal
-          selectedIndexes.add(idx);
-          render();
-          setTimeout(function(){ groceryBtn.click(); }, 200);
-          // Sync the URL fix back to GitHub in background
-          setTimeout(function(){ saveToGitHub('Auto-update: replace flip.it URL for ' + r.title); }, 1000);
-        });
-        list.appendChild(btn);
-      });
-
-      card.querySelector('#picker-cancel').addEventListener('click', function(){ overlay.remove(); });
-    }
-
+    // Show a simple toast — user just opens grocery modal manually if needed
     function tryMatch() {
-      var idx = findByUrl();
+      var idx = recipes.findIndex(function(r) {
+        try {
+          var a = new URL(r.url); var b = new URL(realUrl);
+          return (a.origin + a.pathname).replace(/\/$/,'').toLowerCase() ===
+                 (b.origin + b.pathname).replace(/\/$/,'').toLowerCase();
+        } catch(e) { return r.url === realUrl; }
+      });
       if (idx !== -1) {
-        // Perfect URL match — select and open directly
         selectedIndexes.add(idx);
         render();
         setTimeout(function(){ groceryBtn.click(); }, 200);
@@ -1486,24 +1522,20 @@ window.addEventListener('ExtensionAddRecipe', (e) => {
       return false;
     }
 
-    // Try immediately; if recipes not loaded yet, poll then show picker
     if (!tryMatch()) {
       var toast = document.createElement('div');
       toast.style.cssText = 'position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:#2e2e29;border:1px solid #c8873a;border-radius:24px;padding:10px 22px;font-size:13px;color:#e8e4da;z-index:9999;box-shadow:0 4px 24px rgba(0,0,0,0.5);white-space:nowrap;';
       toast.textContent = '\u23f3 ' + ingCount + ' ingredients ready — loading recipes\u2026';
       document.body.appendChild(toast);
-
       var attempts = 0;
       var poll = setInterval(function() {
         attempts++;
-        if (tryMatch()) {
+        if (tryMatch()) { clearInterval(poll); toast.remove(); }
+        else if (attempts > 10) {
           clearInterval(poll);
-          toast.remove();
-        } else if (attempts > 10) {
-          // Recipes loaded but no URL match — show the picker
-          clearInterval(poll);
-          toast.remove();
-          showPickerDialog();
+          toast.style.borderColor = 'var(--green)';
+          toast.textContent = '\u2713 ' + ingCount + ' ingredients saved — select recipe & open \uD83D\uDED2 Grocery List';
+          setTimeout(function(){ toast.remove(); }, 8000);
         }
       }, 500);
     }
