@@ -1253,10 +1253,8 @@ groceryBtn.addEventListener('click', () => {
   groceryResultSection.style.display = 'none';
 
   selectedRecipes.forEach((r, idx) => {
-    // Check if the bookmarklet already saved ingredients — try URL first, then title
-    const normTitle = r.title.toLowerCase().replace(/[^a-z0-9]/g,' ').replace(/\s+/g,' ').trim();
-    const saved = localStorage.getItem(BOOKMARKLET_KEY + r.url)
-               || localStorage.getItem('recipe_ingredients_title_' + normTitle);
+    // Check if the bookmarklet already saved ingredients for this URL
+    const saved = localStorage.getItem(BOOKMARKLET_KEY + r.url);
 
     const div = document.createElement('div');
     div.style.marginBottom = '18px';
@@ -1407,91 +1405,105 @@ window.addEventListener('ExtensionAddRecipe', (e) => {
     var raw = decodeURIComponent(hash.slice('#recipe-ingredients='.length));
     var data = JSON.parse(raw);
     if (!data.url || !data.ingredients || !data.ingredients.length) return;
-    var key = 'recipe_ingredients_' + data.url;
-    localStorage.setItem(key, data.ingredients.join('\n'));
-    // Also save under title key so flip.it/alias URLs can still find it
-    var titleKey = 'recipe_ingredients_title_' + data.title.toLowerCase().replace(/[^a-z0-9]/g,' ').replace(/\s+/g,' ').trim();
-    localStorage.setItem(titleKey, data.ingredients.join('\n'));
-    // Clean the hash from the URL without reloading
     history.replaceState(null, '', location.pathname + location.search);
-    // Auto-select the matching recipe by URL, then open grocery modal
-    // Normalize URLs for comparison: strip trailing slash and query params
+
+    var realUrl   = data.url;
+    var ingText   = data.ingredients.join('\n');
+    var ingCount  = data.ingredients.length;
+
+    // Save ingredients under the real URL key
+    localStorage.setItem('recipe_ingredients_' + realUrl, ingText);
+
     function normalizeUrl(u) {
-      try {
-        var p = new URL(u);
-        return (p.origin + p.pathname).replace(/\/$/, '').toLowerCase();
-      } catch(e) { return u.toLowerCase().replace(/\/$/, ''); }
+      try { var p = new URL(u); return (p.origin + p.pathname).replace(/\/$/, '').toLowerCase(); }
+      catch(e) { return u.toLowerCase().replace(/\/$/, ''); }
+    }
+    var normReal = normalizeUrl(realUrl);
+
+    // Find the recipe by URL (exact or normalized match)
+    function findByUrl() {
+      return recipes.findIndex(function(r) {
+        return normalizeUrl(r.url) === normReal;
+      });
     }
 
-    var normIncoming = normalizeUrl(data.url);
-    var pendingUrl = normIncoming;
-    var pendingCount = data.ingredients.length;
+    // Show a confirmation dialog listing all recipes so user can pick the right one
+    function showPickerDialog() {
+      var overlay = document.createElement('div');
+      overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.75);z-index:2000;display:flex;align-items:center;justify-content:center;';
 
-    // Fuzzy title comparison — strip accents, lowercase, strip punctuation
-    function normalizeTitle(t) {
-      return (t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-        .toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
-    }
-    var normTitle = normalizeTitle(data.title);
+      var card = document.createElement('div');
+      card.style.cssText = 'background:var(--surface);border:1px solid var(--accent);border-radius:10px;padding:24px;max-width:560px;width:90%;max-height:80vh;overflow-y:auto;box-shadow:0 10px 40px rgba(0,0,0,0.6);';
 
-    function tryAutoSelect() {
-      // First try: exact URL match (normalized)
-      var matchIdx = recipes.findIndex(function(r) { return normalizeUrl(r.url) === pendingUrl; });
-      console.log('[bookmarklet] URL match result:', matchIdx, '| looking for:', pendingUrl);
-      // Second try: title match (handles flip.it and other redirect aliases)
-      if (matchIdx === -1 && normTitle) {
-        console.log('[bookmarklet] Trying title match. normTitle:', normTitle);
-        matchIdx = recipes.findIndex(function(r) {
-          var rt = normalizeTitle(r.title);
-          console.log('[bookmarklet]   comparing vs:', rt);
-          if (rt === normTitle) return true;
-          if (rt.includes(normTitle) || normTitle.includes(rt)) return true;
-          // Score: how many meaningful words from EACH title appear in the OTHER
-          var stopwords = ['recipe','easy','best','with','from','your','ever','most','tasted','delicious','homemade','simple','quick','classic','perfect','great'];
-          var wordsA = normTitle.split(' ').filter(function(w){ return w.length > 3 && stopwords.indexOf(w) === -1; });
-          var wordsB = rt.split(' ').filter(function(w){ return w.length > 3 && stopwords.indexOf(w) === -1; });
-          if (wordsA.length === 0 || wordsB.length === 0) return false;
-          // Count how many of the SHORTER word list appear in the OTHER title
-          var shorter = wordsA.length <= wordsB.length ? wordsA : wordsB;
-          var longerStr = wordsA.length <= wordsB.length ? rt : normTitle;
-          var matches = shorter.filter(function(w){ return longerStr.includes(w); }).length;
-          console.log('[bookmarklet]   wordsA:', wordsA, 'wordsB:', wordsB, 'matches:', matches + '/' + shorter.length);
-          return matches / shorter.length >= 0.6;
+      card.innerHTML =
+        '<h3 style="margin:0 0 6px;color:var(--accent);">\uD83E\uDD44 Which recipe is this?</h3>' +
+        '<p style="margin:0 0 16px;font-size:13px;color:var(--text-muted);">' + ingCount + ' ingredients captured from:<br>' +
+        '<code style="font-size:11px;color:var(--green);">' + realUrl + '</code></p>' +
+        '<p style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">Pick the matching recipe — its stored URL will be updated to the real one so this works automatically next time.</p>' +
+        '<div id="picker-list" style="display:flex;flex-direction:column;gap:6px;"></div>' +
+        '<button id="picker-cancel" style="margin-top:16px;background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);padding:8px 18px;border-radius:6px;cursor:pointer;font-size:13px;">Cancel</button>';
+
+      overlay.appendChild(card);
+      document.body.appendChild(overlay);
+
+      var list = card.querySelector('#picker-list');
+      recipes.forEach(function(r, idx) {
+        var btn = document.createElement('button');
+        btn.style.cssText = 'background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 14px;text-align:left;cursor:pointer;color:var(--text);font-size:13px;transition:border-color 0.15s;';
+        btn.innerHTML = '<strong style="color:var(--accent);">' + r.title + '</strong><br>' +
+          '<span style="font-size:11px;color:var(--text-muted);">' + r.url + '</span>';
+        btn.addEventListener('mouseover', function(){ btn.style.borderColor = 'var(--accent)'; });
+        btn.addEventListener('mouseout',  function(){ btn.style.borderColor = 'var(--border)'; });
+        btn.addEventListener('click', function() {
+          // Update the stored URL to the real one and save
+          recipes[idx].url = realUrl;
+          saveData();
+          // Also save ingredients under the old URL key just in case
+          localStorage.setItem('recipe_ingredients_' + r.url, ingText);
+          overlay.remove();
+          // Select and open grocery modal
+          selectedIndexes.add(idx);
+          render();
+          setTimeout(function(){ groceryBtn.click(); }, 200);
+          // Sync the URL fix back to GitHub in background
+          setTimeout(function(){ saveToGitHub('Auto-update: replace flip.it URL for ' + r.title); }, 1000);
         });
-        console.log('[bookmarklet] Title match result:', matchIdx);
-      }
-      if (matchIdx !== -1) {
-        selectedIndexes.add(matchIdx);
+        list.appendChild(btn);
+      });
+
+      card.querySelector('#picker-cancel').addEventListener('click', function(){ overlay.remove(); });
+    }
+
+    function tryMatch() {
+      var idx = findByUrl();
+      if (idx !== -1) {
+        // Perfect URL match — select and open directly
+        selectedIndexes.add(idx);
         render();
-        setTimeout(function() { groceryBtn.click(); }, 200);
+        setTimeout(function(){ groceryBtn.click(); }, 200);
         return true;
       }
       return false;
     }
 
-    // Try immediately (works if recipes already in localStorage)
-    if (!tryAutoSelect()) {
-      // Recipes not loaded yet — show a holding toast and retry after GitHub fetch
-      var holdToast = document.createElement('div');
-      holdToast.style.cssText = 'position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:#2e2e29;border:1px solid #c8873a;border-radius:24px;padding:10px 22px;font-size:13px;color:#e8e4da;z-index:9999;box-shadow:0 4px 24px rgba(0,0,0,0.5);white-space:nowrap;';
-      holdToast.textContent = '\u23f3 ' + pendingCount + ' ingredients ready — loading recipes…';
-      document.body.appendChild(holdToast);
+    // Try immediately; if recipes not loaded yet, poll then show picker
+    if (!tryMatch()) {
+      var toast = document.createElement('div');
+      toast.style.cssText = 'position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:#2e2e29;border:1px solid #c8873a;border-radius:24px;padding:10px 22px;font-size:13px;color:#e8e4da;z-index:9999;box-shadow:0 4px 24px rgba(0,0,0,0.5);white-space:nowrap;';
+      toast.textContent = '\u23f3 ' + ingCount + ' ingredients ready — loading recipes\u2026';
+      document.body.appendChild(toast);
 
-      // Poll until recipes load (GitHub fetch usually takes 1-3s)
       var attempts = 0;
       var poll = setInterval(function() {
         attempts++;
-        if (tryAutoSelect()) {
+        if (tryMatch()) {
           clearInterval(poll);
-          holdToast.remove();
-        } else if (attempts > 20) {
-          // Give up after ~10 seconds
+          toast.remove();
+        } else if (attempts > 10) {
+          // Recipes loaded but no URL match — show the picker
           clearInterval(poll);
-          holdToast.remove();
-          holdToast.style.borderColor = '#e05555';
-          holdToast.textContent = 'Ingredients saved — select the recipe manually and open \uD83D\uDED2 Grocery List';
-          document.body.appendChild(holdToast);
-          setTimeout(function(){ holdToast.remove(); }, 8000);
+          toast.remove();
+          showPickerDialog();
         }
       }, 500);
     }
