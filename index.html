@@ -1253,8 +1253,10 @@ groceryBtn.addEventListener('click', () => {
   groceryResultSection.style.display = 'none';
 
   selectedRecipes.forEach((r, idx) => {
-    // Check if the bookmarklet already saved ingredients for this URL
-    const saved = localStorage.getItem(BOOKMARKLET_KEY + r.url);
+    // Check if the bookmarklet already saved ingredients — try URL first, then title
+    const normTitle = r.title.toLowerCase().replace(/[^a-z0-9]/g,' ').replace(/\s+/g,' ').trim();
+    const saved = localStorage.getItem(BOOKMARKLET_KEY + r.url)
+               || localStorage.getItem('recipe_ingredients_title_' + normTitle);
 
     const div = document.createElement('div');
     div.style.marginBottom = '18px';
@@ -1407,6 +1409,9 @@ window.addEventListener('ExtensionAddRecipe', (e) => {
     if (!data.url || !data.ingredients || !data.ingredients.length) return;
     var key = 'recipe_ingredients_' + data.url;
     localStorage.setItem(key, data.ingredients.join('\n'));
+    // Also save under title key so flip.it/alias URLs can still find it
+    var titleKey = 'recipe_ingredients_title_' + data.title.toLowerCase().replace(/[^a-z0-9]/g,' ').replace(/\s+/g,' ').trim();
+    localStorage.setItem(titleKey, data.ingredients.join('\n'));
     // Clean the hash from the URL without reloading
     history.replaceState(null, '', location.pathname + location.search);
     // Auto-select the matching recipe by URL, then open grocery modal
