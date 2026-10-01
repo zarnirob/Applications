@@ -630,8 +630,6 @@ input[type=checkbox]:checked::after {
     <input type="text" id="repoInput" placeholder="MyRepo" style="width: 120px;">
     <label><strong>Path:</strong></label>
     <input type="text" id="pathInput" placeholder="data/recipes.csv" style="width: 140px;">
-    <label><strong>Worker URL:</strong></label>
-    <input type="text" id="workerUrlInput" placeholder="https://your-worker.workers.dev" style="width: 260px;">
     <button class="btn btn-primary" id="savePatBtn">Save Settings</button>
   </div>
 
@@ -746,9 +744,6 @@ let toastTimer = null;
 let formattedListText = '';
 let fileSHA = localStorage.getItem('github_file_sha') || '';
 
-const WORKER_URL_KEY = 'worker_url';
-let workerUrl = localStorage.getItem(WORKER_URL_KEY) || '';
-
 const DEFAULT_PAT   = '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';
 const DEFAULT_OWNER = 'zarnirob';
 const DEFAULT_REPO  = 'Applications';
@@ -804,7 +799,6 @@ const fetchGithubBtn        = document.getElementById('fetchGithubBtn');
 const syncGithubBtn         = document.getElementById('syncGithubBtn');
 
 // ── Init settings fields ─────────────────────────────────────────────────────
-document.getElementById('workerUrlInput').value = workerUrl;
 patInput.value   = localStorage.getItem('github_pat')   || DEFAULT_PAT;
 ownerInput.value = repoOwner;
 repoInput.value  = repoName;
@@ -820,8 +814,6 @@ savePatBtn.addEventListener('click', () => {
   localStorage.setItem('github_owner', ownerInput.value.trim());
   localStorage.setItem('github_repo',  repoInput.value.trim());
   localStorage.setItem('github_path',  pathInput.value.trim() || 'data/recipes.csv');
-  workerUrl = document.getElementById('workerUrlInput').value.trim();
-  localStorage.setItem(WORKER_URL_KEY, workerUrl);
   repoOwner = localStorage.getItem('github_owner');
   repoName  = localStorage.getItem('github_repo');
   filePath  = localStorage.getItem('github_path');
