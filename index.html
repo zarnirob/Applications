@@ -1187,36 +1187,78 @@ addRecipeToggle.addEventListener('click', () => {
 });
 closeAddPanel.addEventListener('click', () => { addPanel.style.display = 'none'; });
 
-// ── URL resolver — follows redirects using no-cors fetch trick ────────────────
-async function resolveUrl(url) {
-  // Short URL patterns worth resolving
-  const shortDomains = ['flip.it','bit.ly','tinyurl.com','t.co','ow.ly','buff.ly','goo.gl','tiny.cc','is.gd','rb.gy'];
+// ── URL resolver — follows redirects to get real URL from short links ──────────
+const SHORT_DOMAINS = ['flip.it','bit.ly','tinyurl.com','t.co','ow.ly','buff.ly','goo.gl','tiny.cc','is.gd','rb.gy'];
+
+function isShortUrl(url) {
   try {
     const host = new URL(url).hostname.replace('www.','');
-    if (!shortDomains.some(d => host === d || host.endsWith('.' + d))) return url; // not a short URL
-  } catch(e) { return url; }
+    return SHORT_DOMAINS.some(d => host === d || host.endsWith('.' + d));
+  } catch(e) { return false; }
+}
 
-  try {
-    // no-cors fetch: we can't read the body, but response.url gives the final URL after redirects
-    const res = await fetch(url, { method: 'HEAD', mode: 'no-cors', redirect: 'follow' });
-    // no-cors always gives an opaque response — response.url is empty for opaque
-    // Instead use a tiny redirect-following trick via a CORS-open endpoint
-    const proxyRes = await fetch('https://api.allorigins.win/get?url=' + encodeURIComponent(url), {
-      signal: AbortSignal.timeout(8000)
-    });
-    if (proxyRes.ok) {
-      const data = await proxyRes.json();
-      // allorigins returns the final URL in status.url
-      if (data.status && data.status.url && data.status.url !== url) {
-        const resolved = data.status.url.replace(/\/$/, '');
-        console.log('Resolved', url, '→', resolved);
-        return resolved;
+async function resolveUrl(url) {
+  if (!isShortUrl(url)) return url;
+
+  // Strategy 1: corsproxy.io — returns real response including final URL in headers
+  // We fetch with cors mode so we can read response.url (the redirected destination)
+  const proxies = [
+    u => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+    u => `https://api.allorigins.win/get?url=${encodeURIComponent(u)}`,
+  ];
+
+  for (const makeProxy of proxies) {
+    try {
+      const proxyUrl = makeProxy(url);
+      const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(8000) });
+      if (!res.ok) continue;
+
+      // corsproxy: response.url will be the proxy URL, but check for x-final-url header
+      // or parse the returned content for a canonical/og:url tag
+      const ct = res.headers.get('content-type') || '';
+      let finalUrl = null;
+
+      if (ct.includes('application/json')) {
+        // allorigins — check status.url
+        const data = await res.json();
+        const candidate = data?.status?.url || '';
+        if (candidate && !isShortUrl(candidate) && candidate !== url) {
+          finalUrl = candidate;
+        } else if (data?.contents) {
+          // Parse the HTML for canonical or og:url
+          finalUrl = extractCanonical(data.contents, url);
+        }
+      } else {
+        // corsproxy — raw HTML, parse for canonical
+        const text = await res.text();
+        finalUrl = extractCanonical(text, url);
       }
+
+      if (finalUrl) {
+        console.log('Resolved', url, '→', finalUrl);
+        return finalUrl.replace(/\/$/, '');
+      }
+    } catch(e) {
+      console.warn('Proxy failed:', e.message);
     }
-  } catch(e) {
-    console.warn('Could not resolve URL:', url, e.message);
   }
-  return url; // return original if resolution fails
+
+  console.warn('Could not resolve:', url);
+  return url;
+}
+
+// Extract the real URL from a page's canonical link or og:url meta tag
+function extractCanonical(html, fallback) {
+  if (!html) return null;
+  // <link rel="canonical" href="...">
+  const canonical = html.match(/<link[^>]+rel=["']canonical["'][^>]+href=["']([^"']+)["']/i)
+                 || html.match(/<link[^>]+href=["']([^"']+)["'][^>]+rel=["']canonical["']/i);
+  if (canonical && canonical[1] && !isShortUrl(canonical[1])) return canonical[1];
+  // <meta property="og:url" content="...">
+  const ogUrl = html.match(/<meta[^>]+property=["']og:url["'][^>]+content=["']([^"']+)["']/i)
+             || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:url["']/i);
+  if (ogUrl && ogUrl[1] && !isShortUrl(ogUrl[1])) return ogUrl[1];
+  return null;
 }
 
 addSubmit.addEventListener('click', async () => {
